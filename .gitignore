@@ -1,0 +1,11 @@
+a.out
+.vscode
+*exec*
+*dSYM*
+*.o
+in.txt
+out.txt
+infile
+outfile
+webserv
+bin
