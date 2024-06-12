@@ -1,11 +1,47 @@
-a.out
-.vscode
-*exec*
+# Debug files
 *dSYM*
-*.o
 in.txt
 out.txt
 infile
 outfile
+
+# VScode files
+.vscode
+
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
 webserv
-bin
+*.exe
+*.out
+*.app
+
+# Addons
+.DS_Store
+.vscode
