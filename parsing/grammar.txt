@@ -46,3 +46,21 @@ Class ConfigItem that can be either Config or string
 Or maybe just allow config to be a string
 
 Or maybe make it actually be a string and write all methods by taking some info from a string (really like this idea, need to think about it more)
+
+_________________________________________________________________
+
+Actual parsing:
+
+Remove all spaces/tabs/newlines
+Check grammar (idk)
+
+OBJ: {LINKLIST}
+VALUE: "STR" | OBJ
+LINK: "STR":VALUE
+LINKLIST: LINK (,LINK)*
+
+OBJ -> check surrounding {}, go to LINKLIST
+LINKLIST -> split by commas, do all LINK
+LINK: get "STR":, get VALUE
+VALUE: check if "STR", else go to OBJ
+
