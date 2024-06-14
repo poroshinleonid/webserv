@@ -15,4 +15,7 @@ class Config
         // idk if I need copy/assignment etc
     private:
         std::string content_;
+        std::string key_to_find_;
+        std::string key_found_;
+        std::string value_found_;
 };

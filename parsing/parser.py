@@ -116,7 +116,7 @@ if __name__ == '__main__':
     for j in invalid_jsons:
         try:
             verify(invalid_jsons)
-            print("error")
+            print("should have failed")
             exit(1)
         except AssertionError:
             pass

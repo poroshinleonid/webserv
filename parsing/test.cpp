@@ -1,10 +1,10 @@
 #include <fstream>
 #include <iostream>
 
+using std::string;
+
+string remove_spaces(const string& s);
+
 int main() {
-    std::fstream f;
-    f.open("a.txt");
-    std::cout << f.is_open();
-    char a[10];
-    f.read(a, 1);
+    std::cout << remove_spaces("{\"a  \": \"  b  \"  }  ");
 }
