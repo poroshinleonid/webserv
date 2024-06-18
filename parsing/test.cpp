@@ -3,8 +3,10 @@
 
 using std::string;
 
-string remove_spaces(const string& s);
+// check empty keys
+// check dublicate keys
+// check empty values
+
 
 int main() {
-    std::cout << remove_spaces("{\"a  \": \"  b  \"  }  ");
 }

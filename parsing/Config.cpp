@@ -6,7 +6,8 @@
 using std::vector;
 using std::string;
 
-string remove_spaces(const string& s) {
+// '  {  "a b"   : "c d"  } ' -> '{"a b":"c d"}'
+string Config::remove_spaces(const string& s) {
     string res = "";
     bool in_quote = false;
     for (std::string::const_iterator it = s.begin(); it < s.end(); it++) {
@@ -18,19 +19,3 @@ string remove_spaces(const string& s) {
     return res;
 }
 
-/*
-def remove_spaces(s):
-    i = 0
-    res = []
-    while i < len(s):
-        if (s[i] == '"'):
-            res.append('"')
-            i += 1
-            while i < len(s) and s[i] != '"':
-                res.append(s[i])
-                i += 1
-        if i < len(s) and not s[i].isspace():
-            res.append(s[i])
-        i += 1
-    return ''.join(res)
-*/

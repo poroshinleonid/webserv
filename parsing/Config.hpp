@@ -2,6 +2,8 @@
 
 #include <string>
 
+using std::string;
+
 class Config
 {
     public:
@@ -14,8 +16,9 @@ class Config
 
         // idk if I need copy/assignment etc
     private:
-        std::string content_;
-        std::string key_to_find_;
-        std::string key_found_;
-        std::string value_found_;
+        static string remove_spaces(const string& s);
+        string content_;
+        string key_to_find_;
+        string key_found_;
+        string value_found_;
 };
