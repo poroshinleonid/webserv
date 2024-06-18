@@ -22,10 +22,10 @@ Config Config::operator[](const std::string& key) {
         get_value(key);
     }
     catch (InvalidConfig) {
-        throw std::invalid_argument("Trying to search for a key: \"" + key + "\" in a string that is not an object");
+        throw std::out_of_range("Trying to search for a key: \"" + key + "\" in a string that is not an object");
     }
     if (!is_key_found_) {
-        throw std::invalid_argument("Key " + key + " not found");
+        throw std::out_of_range("Key " + key + " not found");
     }
     return Config(value_found_, true);
 }
@@ -59,7 +59,6 @@ string Config::remove_spaces(const string& s) {
 Config::Config(const std::string& content, bool /* dummy */): depth_(0), content_(content) {}
 
 void Config::throw_if_invalid() {
-    // TODO: check here that no dublicate keys
     if (eat_obj(content_) != "")
         throw InvalidConfig("invalid content after }");
 }

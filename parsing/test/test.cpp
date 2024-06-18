@@ -36,7 +36,7 @@ int main() {
         a["not found"];
         throw std::exception();
     }
-    catch (std::invalid_argument) {}
+    catch (std::out_of_range) {}
 
     try {
         a.unwrap();
@@ -51,5 +51,7 @@ int main() {
     CheckIfInvalid("NonClosing.cfg");
     CheckIfInvalid("NonExisting.cfg");
     CheckIfInvalid("EmptyKey.cfg");
-    CheckIfInvalid("DublicateValue.cfg"); // TODO: make it pass
+    Config whatever("DublicateValue.cfg"); 
+    Config whatever2("DublicateValueDeep.cfg");
+    assert(whatever2["a"]["b"]["c"].unwrap() == "g");
 }
