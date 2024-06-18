@@ -8,8 +8,9 @@ STR: "some text"
 
 # put those 2 values in class / namespace to avoid globals
 value_found = ""
-key_to_find = "age"
+key_to_find = "a"
 key_found = ""
+depth = 0
 
 def remove_spaces(s):
     i = 0
@@ -26,7 +27,7 @@ def remove_spaces(s):
         i += 1
     return ''.join(res)
 
-def verify(s):
+def verify(s): # get_value
     global key_found, value_found
 
     key_found = ""
@@ -36,8 +37,8 @@ def verify(s):
     assert s == ''
 
 def eat_obj(s):
-    global key_found, value_found, key_to_find
-    assert len(s) >= 2 and s[0] == '{'
+    global key_found, value_found, key_to_find, depth
+    assert len(s) >= 1 and s[0] == '{'
     in_quote = False
     open_curly = 1
     i = 1
@@ -49,7 +50,7 @@ def eat_obj(s):
         if not in_quote and s[i] == '}':
             open_curly -= 1
             if open_curly == 0:
-                if key_found == key_to_find:
+                if depth == 1 and key_found == key_to_find:
                     value_found = s[:i+1]
                 verify_linklist(s[1:i])
                 return s[i+1:]
@@ -57,12 +58,16 @@ def eat_obj(s):
     assert False
 
 def verify_linklist(s):
+    global depth
+    depth += 1
     while s:
         s = eat_link(s)
         if not s:
+            depth -= 1
             return
         assert s[0] == ','
         s = s[1:]
+    assert False
 
 def eat_link(s):
     global key_found
@@ -77,13 +82,13 @@ def eat_link(s):
     return s
 
 def eat_value(s):
-    global value_found, key_found, key_to_find
+    global value_found, key_found, key_to_find, depth
 
     assert s
     if s[0] == '"':
         i = s.find('"', 1)
         assert i != -1
-        if key_found == key_to_find:
+        if depth == 1 and key_found == key_to_find:
             value_found = s[1:i]
             key_found = ""
         return s[i+1:]
@@ -108,6 +113,8 @@ if __name__ == '__main__':
     },
     "lastLogin": "2024-06-14T12:34:56Z"
 }'''
+    good = '{"a":"b",}'
+    # good = '{"a": "1", "a": "1", "a": {"a": "2", "a": "2", "a": {"a": "3"}}, "a": "1", "a": "1"}'
     verify(good)
     print(value_found)
     # invalid_jsons = [
