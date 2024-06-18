@@ -17,6 +17,11 @@ STR: "some text"
 /* For future: better to create a way to iterate over data structure and use it to implement methods
 instead of doing this bullshit. */
 
+
+/*
+Usage: construct Config from a file, and then call something like
+config["key1"]["key2"].unwrap() to get values
+*/
 class Config
 {
     public:
