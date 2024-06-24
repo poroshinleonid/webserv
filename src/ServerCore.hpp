@@ -1,0 +1,4 @@
+#ifndef SERVER_CORE_HPP
+#define SERVER_CORE_HPP
+
+#endif // SERVER_CORE_HPP

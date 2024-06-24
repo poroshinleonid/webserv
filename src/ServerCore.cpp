@@ -2,5 +2,5 @@
 #include <iostream>
 
 void show() {
-  std::cout << DEFINED << std::endl;
+  std::cout << "Hello" << std::endl;
 }
