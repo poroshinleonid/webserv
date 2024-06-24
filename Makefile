@@ -12,7 +12,8 @@ INC_FLAGS := -I ./$(INCDIR)
 
 MAINSOURCE := $(SRCDIR)/main.cpp
 SOURCE_FILES := \
-								ServerCore.cpp
+								ServerCore.cpp \
+								Config.cpp
 
 SOURCES := $(addprefix $(SRCDIR)/,$(SOURCE_FILES))
 OBJECTS = $(addprefix $(OBJDIR)/,$(SOURCE_FILES:.cpp=.o))
