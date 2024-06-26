@@ -4,6 +4,8 @@
 
 int main(int argc, char **argv){
   if (argc != 2) {
+  std::cout << "gib args (conf file)\n";
+
     exit(1);
   }
   Config config(argv[1]);
@@ -15,5 +17,6 @@ int main(int argc, char **argv){
   std::cout << "Server Core Created\n";
   core.setup();
   std::cout << "Server Core set up done\n";
+  core.run();
   return(0);
 }
