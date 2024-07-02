@@ -1,5 +1,7 @@
 #include "ServerCore.hpp"
 
+#include <iostream>
+
 ServerCore::ServerCore() {}
 
 ServerCore::ServerCore(ServerCore const &other) {(void)other;};
@@ -27,6 +29,12 @@ int ServerCore::setup() {
     server_addr_in.sin_addr.s_addr = INADDR_ANY; // FIX - add real IP that was in the config
     server_addr_in.sin_port = htons(port_);
     memset(&(server_addr_in.sin_zero), '\0', 8);
+
+  int opt = 1;
+  if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+    perror("setsockopt");
+    return (-1);
+  }
 
   if (bind(listen_fd, (struct sockaddr *)&server_addr_in, sizeof(server_addr_in)) < 0) {
       perror("bind");
@@ -96,6 +104,8 @@ int ServerCore::run() {
   char buffer[BUFF_SIZE_SERV];
 
   fd_set cur_read_fds, cur_write_fds;
+  fd_set new_fds;
+  (void)new_fds;
   int maxfd = listen_fd;
   int new_fd;
   std::cout << "RUNNING\n";
@@ -110,7 +120,6 @@ int ServerCore::run() {
         std::cout << "SELECTION ERROR LMAO";
         exit(1);
     }
-
 
     // std::cout << "Something was selected!" << std::endl;
     // fd starts with 3 because 0 = stdin, 1 =stdout, 2 = stderr
@@ -134,45 +143,61 @@ int ServerCore::run() {
               printf("New connection from %s on socket %d\n",
                       inet_ntoa(client_addr.sin_addr), new_fd);
           }
+          continue ;
         } else {
               // need to work on input from the client
               std::cout << "input reading\n";
 
             int nbytes = recv(i, buffer, sizeof(buffer) - 1, 0);
             if (nbytes <= 0) {
+                              std::cout << "recv returned less than 1" << std::endl;
                               if (nbytes == 0) {
+
                                   printf("Socket %d hung up\n", i);
+                                  fflush(stdout);
+                                  fflush(stderr);
                               } else {
                                   perror("recv");
+                                  fflush(stdout);
+                                  fflush(stderr);
                               }
                               close(i);           
-                              FD_CLR(i, &all_fds_set_); 
+                              FD_CLR(i, &all_fds_set_);
+                              FD_CLR(i, &reading_set_);
+                              FD_CLR(i, &writing_set_);
             } else {
               // printf data that was recieved from the slient
               buffer[nbytes] = '\0';
               printf("Received: %s", buffer);
             }
+          FD_SET(i, &new_fds);
           continue;
         }
-      //  } else if (FD_ISSET(i, &cur_read_fds) && FD_ISSET(i, &cur_write_fds)) { // elif
-       } else if (FD_ISSET(i, &cur_write_fds)) { // elif
-        std::cout << "Something was selected to WRITE!" << std::endl;
+        // } else if (FD_ISSET(i, &cur_read_fds) && FD_ISSET(i, &cur_write_fds)) { // elif
+       } else if (FD_ISSET(i, &cur_write_fds) && FD_ISSET(i, &new_fds) && i != listen_fd) { // elif
+        std::cout << "Something was selected to WRITE! on socket " << i << std::endl;
         // There's no input from the client, we can send some data
         // I think if we still have any data to read, we cannot write
         // if we can, just replace elif with just if
         // Send a simple HTTP response
-        if (i == listen_fd) {
-          continue;
-        }
-        std::cout << "Trying to write onto fd " << i << std::endl;
         const char *response = "HTTP/1.1 200 OK\r\n"
                               "Content-Type: text/plain\r\n"
                               "Content-Length: 12\r\n"
                               "\r\n"
                               "Hello world!";
-        if (send(i, response, strlen(response), 0) == -1) {
+        int sent_len = send(i, response, strlen(response), 0);
+        if (sent_len == -1) {
+            std::cerr << "error sending the response\n";
             perror("send");
+        } else if (sent_len == strlen(response)) {
+          std::cout << "allegedly wrote to fd " << i << std::endl;
+        } else {
+          std::cout << "fd " << i  << "din not read all of my bytes for some reason" << std::endl;
         }
+
+        FD_CLR(i, &new_fds); 
+      } else {
+        // check if the connection has timed out
       }
 
 

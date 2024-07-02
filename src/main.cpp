@@ -18,5 +18,6 @@ int main(int argc, char **argv){
   core.setup();
   std::cout << "Server Core set up done\n";
   core.run();
+  std::cout << "End of the program" << std::endl;
   return(0);
 }
