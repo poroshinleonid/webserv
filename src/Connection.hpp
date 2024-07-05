@@ -34,9 +34,10 @@ private:
   void handle_accept(int fd);
   int handle_cgi_output(int cgi_pipe_fd);
   void handle_incoming_data(int fd);
-  void handle_write(int fd);
+  int handle_write(int fd);
 
   int handle_request_if_ready(int fd);
+  void check_timeouts(int fd);
 
 private:
   int accept_(); // accept new connection, returns new_fd. updates (or not?) read_buffers and write_buffers maps.

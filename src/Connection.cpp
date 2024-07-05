@@ -107,7 +107,7 @@ void Connection::handle_fds() {
     } else if (FD_ISSET(i, &write_fds_)&& i != listen_fd_) {
       handle_write(i);
     } else {
-      handle_request_if_ready(i);
+      check_timeouts(i);
     }
   }
 }
@@ -171,11 +171,20 @@ void Connection::handle_incoming_data(int fd) {
   return ;
 }
 
-void Connection::handle_write(int fd) {
-  // if there's something in the write_buffer, send() a chunk from the buffer
-    // also crop the buffer and if needed clear and do all upkeep
+
+
+int Connection::handle_write(int fd) {
+  static char send_chunk[CHUNK_SZ_FIX];
+  std::string &s = write_buffers_[fd];
+  if (!s.empty()) {
+    return send_chunk_(fd);;
+  }
   // if the write_buffer is empty, call handle_request() and (possibly) fill the write_buffer
   // handle_request() should do all the upkeep (cropping read_buffer, etc) itself
+  if (handle_request_if_ready(fd) == -1) {
+    return -1;
+  }
+  return 0;
 }
 
 
@@ -273,9 +282,33 @@ so I can just call handle_request_if_ready(fd) and assume everything is good (un
 // and then save the result into a buffer so it can be sent later
 // handle_request() should do all the upkeep (cropping read_buffer, etc) itself
 int Connection::handle_request_if_ready(int fd) {
-    //if rnrn found, crop it from the buffer and send synchronously to requesthandler
+  (void)fd;
+  // sent a links (reference&)s to the read_buffer and write_buffer to the requesthandler
+  // recieve -1 if error, 0 if sucessfully processed
+  
+/* what requesthandler does:
+  1. determines if there's a full chunk of an http request that can be processed and saved
+  2. if so, processes it, saves it and removes the strrepr of it from the read_buffer
+  3. if the full REQUEST is recieved (this implies that read_buffer becomes clean)
+      then handler should send it to ResponseGenerator and save the response in write_buffer
+  4. return
+*/
+
+}
+
+
+
+
+
+
+   //if rnrn found, crop it from the buffer and send synchronously to requesthandler
     //recieve a string from requesthandler and write it into the write_buffer
     //somehow we need to track if our response was sent to CGI, in which case save FD to 
       //to all maps and continue.
   //if not found, continue;
+
+
+void Connection::check_timeouts(int fd) {
+  //close stuff if it's taking too long
+  //including chunked requests, pipes, etc
 }
