@@ -1,3 +1,0 @@
-add ServerCore::die() or some other way to close the sockets
-
-Handle Keep-Alive Connections: Make sure your server can handle HTTP keep-alive connections properly and recognize when a connection is reused for multiple requests.
