@@ -11,7 +11,7 @@ public:
   Logger &operator=(const Logger &obj);
   void log(const std::string message) const;
 
-  // operator<< ?
+  // operator<<
 private:
 };
 
