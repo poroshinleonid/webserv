@@ -16,6 +16,15 @@ Connection::Connection(const std::string &ip, int port, int listen_backlog)
 
 }
 
+Connection::~Connection() {
+  for (int i = 0; i < max_fd_; i++) {
+    if (FD_ISSET(i, &all_fds_)) {
+      close(i);
+      FD_CLR(i, &all_fds_);
+    }
+  }
+}
+
 int Connection::setup(const Config& config) {
   (void)config;
   listen_fd_ = socket(AF_INET, SOCK_STREAM, 0);
@@ -71,8 +80,7 @@ int Connection::setup(const Config& config) {
 int Connection::run(const Config& config) {
   (void)config;
   char buffer[CHUNK_SZ_FIX]; // FIX - buffer size should be dynamic depending on config or idk on something else
-
-  int accept_fd;
+  (void)buffer;
   std::cout << "Starting select() loop" << std::endl;
   while (true) {
     FD_ZERO(&read_fds_);
@@ -101,7 +109,7 @@ int Connection::run(const Config& config) {
 
 
 void Connection::handle_fds() {
-  for (int i = 0; i <= max_fd_; i++) {
+  for (int i = 3; i <= max_fd_; i++) {
     if (FD_ISSET(i, &read_fds_)) {
       handle_read(i);
     } else if (FD_ISSET(i, &write_fds_)&& i != listen_fd_) {
@@ -138,7 +146,8 @@ int Connection::handle_cgi_output(int cgi_pipe_fd) {
   if (!(FD_ISSET(socket_to_send, &all_fds_))) {
     close(cgi_pipe_fd);
     cgi_pipes_to_sockets_.erase(cgi_pipe_fd);
-    return ;
+    std::cout << "chi output is ready but the connection is already closed" << std::endl;
+    return 0;
   }
   bzero(cgi_chunk, sizeof(cgi_chunk)); // FIX: needs optimization
   int read_bytes = read(cgi_pipe_fd, cgi_chunk, sizeof(cgi_chunk));
@@ -168,13 +177,18 @@ void Connection::handle_incoming_data(int fd) {
     perror("recv");
     return ; // FIX - should return recvd bytes or something idk
   }
+  if (recvd_bytes == 0) {
+    close(fd);
+    FD_CLR(fd, &all_fds_);
+    read_buffers_.erase(fd);
+    write_buffers_.erase(fd);
+  }
   return ;
 }
 
 
 
 int Connection::handle_write(int fd) {
-  static char send_chunk[CHUNK_SZ_FIX];
   std::string &s = write_buffers_[fd];
   if (!s.empty()) {
     return send_chunk_(fd);;
@@ -230,7 +244,7 @@ int Connection::accept_() {
 int Connection::recv_chunk_(int fd) {
   static char recv_chunk[CHUNK_SZ_FIX];
   bzero((void *)recv_chunk, sizeof(recv_chunk)); // FIX - just add \0 after reading to save time!
-  int recvd_bytes = recv(fd, recv_chunk, sizeof(recv_chunk - 1), 0);
+  int recvd_bytes = recv(fd, recv_chunk, sizeof(recv_chunk) - 1, 0);
   if (recvd_bytes < 0) {
     return recvd_bytes;
   }
@@ -259,6 +273,7 @@ int Connection::send_chunk_(int fd) {
   if (sent_bytes != -1) {
     s.erase(0, sent_bytes);
   }
+  std::cout << "send_chunk, whats left is " << s << std::endl;
   return sent_bytes;
 }
 
@@ -286,14 +301,25 @@ int Connection::handle_request_if_ready(int fd) {
   // sent a links (reference&)s to the read_buffer and write_buffer to the requesthandler
   // recieve -1 if error, 0 if sucessfully processed
   
-/* what requesthandler does:
+/* what requesthandler does:  
   1. determines if there's a full chunk of an http request that can be processed and saved
   2. if so, processes it, saves it and removes the strrepr of it from the read_buffer
   3. if the full REQUEST is recieved (this implies that read_buffer becomes clean)
       then handler should send it to ResponseGenerator and save the response in write_buffer
   4. return
 */
-
+  if (read_buffers_[fd].find(std::string("\r\n")) != std::string::npos) {
+  read_buffers_[fd].clear();
+  const char *response = "HTTP/1.1 200 OK\r\n"
+                      "Content-Type: text/plain\r\n"
+                      "Content-Length: 12\r\n"
+                      "\r\n"
+                      "Hello world!";
+  write_buffers_[fd].append(response);
+  std::cout << "Request handled i guess, socket " << fd << std::endl;
+  
+  }
+  return (0);
 }
 
 
@@ -309,6 +335,7 @@ int Connection::handle_request_if_ready(int fd) {
 
 
 void Connection::check_timeouts(int fd) {
+  (void)fd;
   //close stuff if it's taking too long
   //including chunked requests, pipes, etc
 }
