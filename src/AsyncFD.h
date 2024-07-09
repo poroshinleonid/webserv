@@ -2,13 +2,15 @@
 #define AsyncFD_HPP
 
 #include <string>
+#include <map>
+#include <queue>
 
 enum fd_type {
-  file = 0,
-  socket = 1,
-  stream = 2,
-  pipe_to_read = 3,
-  pipe_to_write = 4
+  FD_TYPE_FILE = 0,
+  FD_TYPE_SOCK = 1,
+  FD_TYPE_STRM = 2,
+  FD_TYPE_PIPE_TO_READ = 3,
+  FD_TYPE_PIPE_TO_WRIT = 4
 };
 
 class	AsyncFD {
@@ -18,8 +20,11 @@ public:
   ~AsyncFD();
   AsyncFD &operator=(const AsyncFD &obj);
 
-  int async_write(const std::string &msg);
+  int async_write(const std::string &msg); //write or send determined by fd_type
   int async_read(std::string &buffer, int len);
+
+  bool is_write_buf_empty();
+  bool is_read_buf_empty();
 
 private:
   int fd;
