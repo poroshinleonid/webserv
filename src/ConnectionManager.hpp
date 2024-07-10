@@ -23,10 +23,9 @@
 #define CHUNK_SZ_FIX 1024
 
 class	ConnectionManager {
-public:
+private:
   ConnectionManager();
   ConnectionManager(ConnectionManager const &other);
-  ~ConnectionManager();
   ConnectionManager &operator=(const ConnectionManager &obj);
 
 //  public:
@@ -35,6 +34,7 @@ public:
 
 public:
   ConnectionManager(Config &cfg);
+  ~ConnectionManager();
 
 
 public:
@@ -47,12 +47,16 @@ public:
   int handle_poll_write(int fd);
   int handle_accept(int fd);
 
+private:
+  int processRequest(HttpConnection &connection);
 
 private:
   Config &config;
   std::vector<struct pollfd> fds;
   std::map<int, HttpConnection> connections;
   std::vector<int> listen_fds;
+  char buffer[4096]; // FIX is it the right size?
+  char cgi_buffer[1024]; // FIX is it the right size?
 
 
 

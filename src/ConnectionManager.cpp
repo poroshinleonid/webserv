@@ -1,5 +1,7 @@
 #include "Config.hpp"
 #include "ConnectionManager.hpp"
+#include "HttpConnection.hpp"
+
 
 #include <iostream>
 #include <map>
@@ -12,13 +14,16 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <stdlib.h>
 
 ConnectionManager::ConnectionManager(Config &cfg) {
   config = cfg;
+  bzero(buffer, sizeof(buffer));
+  bzero(cgi_buffer, sizeof(cgi_buffer));
 }
 
 ConnectionManager::~ConnectionManager() {
-  // FIX - write a destructor
+  free(buffer);
 }
 
 int ConnectionManager::setup(const Config& config) {
@@ -92,19 +97,20 @@ int ConnectionManager::run(const Config& config) {
   return 0;
 }
 
+// fix handle_ functions return values
 int ConnectionManager::handle_fds(int fd_count) {
   (void)fd_count;
   for (int i = 0, sz = fds.size(); i < sz; i++) {
     if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-      if (handle_poll_problem(i)) {
+      if (handle_poll_problem(i) != 0) {
         break;
       }
     }else if (fds[i].revents & POLLIN) {
-      if (handle_poll_read(i)) {
+      if (handle_poll_read(i) != 0) {
         break;
       }
     } else if (fds[i].revents & POLLOUT) {
-      if (handle_poll_write(i)) {
+      if (handle_poll_write(i) != 0) {
         break;
       }
     } else {
@@ -120,8 +126,34 @@ int ConnectionManager::handle_poll_problem(int fd) {
 }
 
 int ConnectionManager::handle_poll_read(int fd) {
-  std::cout << "READING" << std::endl; // FIX
+  if (std::find(listen_fds.begin(), listen_fds.end(), fd) == listen_fds.end()) {
+    return handle_accept(fd);
+  }
+  HttpConnection &connection = connections[fd];
+  connection.busy = true;
+  int bytes_recvd = recv(fd, buffer, sizeof(buffer), 0);
+  if (bytes_recvd < 0) {
+    //FIX show error, close connection (or set the flag to close it later)
+    connection.should_die = true;
+    return -1;
+  }
+  if (bytes_recvd == 0) {
+    //FIX close connection (or set the flag to close it later)
+    connection.should_die = true;
+    return 0;
+  }
+  connection.recv_buffer.append(buffer);
+  bzero(buffer, sizeof(buffer));
+  if (!connection.header_is_parsed) {
+    //parse the header
+  }
+  //if header is parsed and the length of content equals request's content length, set body_is_read = true;
 
+  if (connection.body_is_read == true) {
+    processRequest(connection);
+  }
+
+  return bytes_recvd;
 }
 
 int ConnectionManager::handle_poll_write(int fd) {
@@ -130,4 +162,9 @@ int ConnectionManager::handle_poll_write(int fd) {
 }
 
 int ConnectionManager::handle_accept(int fd) {
+}
+
+
+int ConnectionManager::processRequest(HttpConnection &connection) {
+  std::cout << "processRequest called!" << std::endl;
 }
