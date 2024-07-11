@@ -1,4 +1,4 @@
-#include "../../src/Connection.hpp"
+#include "../../src/ConnectionManager.hpp"
 #include "../../src/Config.hpp"
 #include <iostream>
 
@@ -13,7 +13,7 @@ int main(int argc, char **argv){
     // std::cout << "host: " << config["database"]["host"].unwrap() << std::endl;
     // std::cout << "port: " << config["server"]["port"].unwrap() << std::endl;
 
-  Connection main_connection("127.0.0.1", 18000, 100);
+  ConnectionManager main_connection("127.0.0.1", 18000, 100);
   main_connection.setup(config);
   main_connection.run(config);
   return(0);
