@@ -150,7 +150,7 @@ int ConnectionManager::handle_poll_read(int fd) {
   //if header is parsed and the length of content equals request's content length, set body_is_read = true;
 
   if (connection.body_is_read == true) {
-    processRequest(connection);
+    process_request(connection);
   }
 
   return bytes_recvd;
@@ -162,9 +162,122 @@ int ConnectionManager::handle_poll_write(int fd) {
 }
 
 int ConnectionManager::handle_accept(int fd) {
+	sockaddr_in socket_address;
+	socklen_t socket_address_length = sizeof(socket_address);
+  int new_fd = accept(fd, (sockaddr *)&socket_address, &socket_address_length);
+  if (new_fd == -1) {
+    return (-1);
+  }
+  HttpConnection connection(config);
+  // FIX do it in the constructor
+  connection.fd = new_fd;
+  connection.port = (int)socket_address.sin_port;
+  connection.config = config;
+  connection.busy = false;
+  connection.is_connected = true;
+  connection.is_cgi_running = false;
+  connection.cgi_finished = false;
+  connection.should_die = false;
+  connection.is_response_ready = false;
+  connection.is_keep_alive = false;
+  connection.header_is_parsed = false;
+  connection.body_is_read = false;
+  connection.cgi_pid = 0;
+  connection.cgi_pipe[0] = 0;
+  connection.cgi_pipe[1] = 0;
+  struct pollfd new_pollfd_struct;
+  new_pollfd_struct.fd = new_fd;
+  new_pollfd_struct.events = 0;
+  new_pollfd_struct.revents = 0;
+  fds.push_back(new_pollfd_struct);
+  connections[new_fd] = connection;
+  return new_fd;
+
 }
 
 
-int ConnectionManager::processRequest(HttpConnection &connection) {
-  std::cout << "processRequest called!" << std::endl;
+int ConnectionManager::process_request(HttpConnection &connection) {
+  std::cout << "process_request called!" << std::endl;
+  HttpRequest request(connection.recv_buffer); // FIX - this constructor should fill in the request
+  //check request validity if request.isValid()
+  if (request.is_for_cgi) {
+    return run_cgi(connection, request);
+  }
+  if (connection.cgi_finished) {
+    answer_request_with_string(connection)
+  } else {
+    answer_request(connection, request);
+  }
+}
+
+int ConnectionManager::answer_request(HttpConnection &connection, HttpRequest &request) {
+  //forms the writebuffer
+  //calls answer_request_with_string to send the said buffer
+  //if al sent, reset the state, depending on keep-alive and stuff like that
+}
+
+int ConnectionManager::answer_request_with_string(HttpConnection &connection) {
+  //send the cgi_string to the connection
+}
+
+
+int ConnectionManager::run_cgi(HttpConnection &connection, HttpRequest &request) {
+  if (connection.is_cgi_running) {
+    return exec_cgi(connection, request);
+  }
+  std::string cgi_response_tmp = try_read_fork(connection, request);
+  if (cgi_response_tmp == "error of some type") { // FIX: error codenames, etc
+    connection.cgi_response = cgi_response_tmp;
+    return -1;
+  } else if (cgi_response_tmp == "fin") {
+    connection.send_buffer = connection.cgi_response;
+    connection.cgi_response.clear();
+    connection.cgi_finished = true;
+    return 0;
+  }
+  connection.cgi_response.append(cgi_response_tmp);
+  return 0;
+}
+
+int ConnectionManager::exec_cgi(HttpConnection &connection, HttpRequest &request) {
+  pid_t pid = fork();
+  if (pid == -1) {
+    return -1;
+  }
+  if (pid != 0) {
+    connection.cgi_pid = pid;
+    connection.is_cgi_running = true;
+    connection.cgi_finished = false;
+    connection.busy = true;
+    return pid;
+  }
+  // FIX form pipes
+  // FIX actually send something to the script
+  execve("./test/cgi/cgi1.py", NULL, NULL); // FIX cgi path should be stored in config, should it?
+  //4. if child, do prep and send all the necessary data to execve
+  exit(-1);
+}
+
+std::string ConnectionManager::try_read_fork(HttpConnection &connection, HttpRequest &request) {
+  std::string s;
+  //  1. if fork timed out, die
+  //  2. do waitpid() to check the status of the process
+  /*  3. if fork error then handle it
+      if fork WIFEXITED sucessfully, read all of the data in a while loop  to a string (FIX: add hasExited variable to save this and make this string a part of Connection instance)!
+      ofc handle all errors
+      Return the read string*/
+  return s;
+}
+
+
+
+void ConnectionManager::update_last_activity(HttpConnection &connection) {
+  time_t new_time;
+  new_time = std::time(&new_time);
+  if (new_time == -1) {
+    // FIX - log an error, maybe throw an exception and kill the whole connection of the whole server idk
+    return;
+  }
+  connection.last_activity = new_time;
+  return;
 }

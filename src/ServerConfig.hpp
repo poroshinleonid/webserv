@@ -31,7 +31,7 @@ public:
   ~ServerConfig();
   ServerConfig &operator=(const ServerConfig &obj);
 
-private:
+public:
   int port;
   std::string host;
   bool is_default;

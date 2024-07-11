@@ -48,7 +48,17 @@ public:
   int handle_accept(int fd);
 
 private:
-  int processRequest(HttpConnection &connection);
+  int process_request(HttpConnection &connection);
+  int answer_request(HttpConnection &connection, HttpRequest &request);
+  int answer_request_with_string(HttpConnection &connection);
+
+private:
+  int run_cgi(HttpConnection &connection, HttpRequest &request);
+  int exec_cgi(HttpConnection &connection, HttpRequest &request);
+  std::string try_read_fork(HttpConnection &connection, HttpRequest &request);
+
+private:
+  void update_last_activity(HttpConnection &connection);
 
 private:
   Config &config;
