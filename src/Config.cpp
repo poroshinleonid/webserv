@@ -95,7 +95,7 @@ string Config::eat_obj(const string& s) {
     }
     bool in_quote = false;
     int open_curly = 1;
-    for (int i = 1; i < s.length(); i++) {
+    for (size_t i = 1; i < s.length(); i++) {
         if (s[i] == '"')
             in_quote = !in_quote;
         if (!in_quote && s[i] == '{')
@@ -133,7 +133,7 @@ string Config::eat_link(string s) {
 
     if (s.empty() || s[0] != '"')
         throw InvalidConfig("Missing opening double quote");
-    int i = s.find('"', 1);
+    size_t i = s.find('"', 1);
     if (i == s.npos)
         throw InvalidConfig("Missing closing double quote");
     key_found_ = s.substr(1, i - 1);
