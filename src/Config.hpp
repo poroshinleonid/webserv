@@ -1,33 +1,22 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 using std::string;
-
-/*
-grammar.
-
-OBJ: {LINKLIST}
-VALUE: STR | OBJ
-LINK: STR:VALUE
-LINKLIST: empty | LINK(,LINK)*
-STR: "some text"
-*/
-
-/* For future: better to create a way to iterate over data structure and use it to implement methods
-instead of doing this bullshit. */
-
+using std::vector;
 
 /*
 Usage: construct Config from a file, and then call something like
-config["key1"]["key2"].unwrap() to get values
+config["key1"].get_vec["key2"][1]["key2"].unwrap() to get values
 */
 class Config
 {
     public:
         std::string unwrap(); // returns content string or throws std::invalid_argument
         std::string get_content();
-        Config operator[](const std::string& key); // gets config by key, throws std::out_of_range if not found
+        Config operator[](const std::string& key); // gets config by key, throws std::out_of_range if not found, if multiple elements, returns the last one
+        vector<Config> get_vec(const std::string& key); // returns vector of configs (one entry for each key entry)
 
         Config(const std::string& filename); /* parses config from a file and 
         throws if failed to open/failed to parse */
@@ -47,8 +36,7 @@ class Config
         string content_;
         string key_to_find_;
         string key_found_;
-        bool is_key_found_;
-        string value_found_;
+        vector<string> values_found_;
 };
 class InvalidConfig: public std::runtime_error {
 public:
@@ -56,3 +44,13 @@ public:
         : std::runtime_error(msg) {
     }
 };
+
+/*
+grammar.
+
+OBJ: {LINKLIST}
+VALUE: STR | OBJ
+LINK: STR:VALUE
+LINKLIST: empty | LINK(,LINK)*
+STR: "some text"
+*/
