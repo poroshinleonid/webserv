@@ -12,51 +12,49 @@
 // }
 
 
-Logger::Logger() : debug(NULL), info(NULL), warning(NULL), error(NULL) {
-  debug = new LoggerStream("DEBUG");
-  info = new LoggerStream("INFO");
-  warning = new LoggerStream("WARNING");
-  error = new LoggerStream("ERROR");
+Logger::Logger() : debug("DEBUG"), info("INFO"), warning("WARNING"), error("ERROR"),
+                    debug_(NULL), info_(NULL), warning_(NULL), error_(NULL) {
 }
 
 Logger::Logger (const std::string &debug_file, const std::string &info_file,
-                const std::string &warning_file, const std::string &error_file) : Logger() {
-  debug = get_file_log_stream("DEBUG", debug_file);
-  info = get_file_log_stream("INFO", info_file);
-  warning = get_file_log_stream("WARNING", warning_file);
-  error = get_file_log_stream("ERROR", error_file);
+                const std::string &warning_file, const std::string &error_file)
+  : debug("DEBUG"), info("INFO"), warning("WARNING"), error("ERROR"),
+    debug_(NULL), info_(NULL), warning_(NULL), error_(NULL) {
+  debug_ = get_file_log_stream("DEBUG", debug_file);
+  info_ = get_file_log_stream("INFO", info_file);
+  warning_ = get_file_log_stream("WARNING", warning_file);
+  error_ = get_file_log_stream("ERROR", error_file);
+  if (debug_) {
+    debug = *debug_;
+  }
+
 }
 
 Logger::~Logger() {
-  if (debug) {
-    delete debug;
+  if (debug_) {
+    delete debug_;
   }
-  if (info) {
-    delete info;
+  if (info_) {
+    delete info_;
   }
-  if (warning) {
-    delete warning;
+  if (warning_) {
+    delete warning_;
   }
-  if (error) {
-    delete error;
+  if (error_) {
+    delete error_;
   }
 }
 
 LoggerStream *Logger::get_file_log_stream(const std::string &prefix, const std::string &filename) {
-  try {
-    std::ofstream *file_stream = new std::ofstream;
-    file_stream->open(filename);
-    if (!file_stream->is_open()) {
-      std::cerr << "Could not open log file " << filename << std::endl;
-      delete file_stream;
-      return NULL;
-    }
-    LoggerStream *logger_stream = new LoggerStream(prefix, &std::clog, file_stream);
-    return logger_stream;
-  } catch (const std::exception &e) {
-    std::cerr << e.what() << std::endl;
+  std::ofstream *file_stream = new std::ofstream;
+  file_stream->open(filename);
+  if (!file_stream->is_open()) {
+    std::cerr << "Could not open log file " << filename << std::endl;
+    delete file_stream;
     return NULL;
   }
+  LoggerStream *logger_stream = new LoggerStream(prefix, &std::clog, file_stream);
+  return logger_stream;
 }
 
 

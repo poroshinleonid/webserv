@@ -21,13 +21,17 @@ private:
   LoggerStream *get_file_log_stream(const std::string &prefix, const std::string &filename);
 
   // void log(const std::string message) const;
-
 public:
-  LoggerStream *debug;
-  LoggerStream *info;
-  LoggerStream *warning;
-  LoggerStream *error;
-  std::vector<std::ofstream> file_streams;
+  LoggerStream debug;
+  LoggerStream info;
+  LoggerStream warning;
+  LoggerStream error;
+
+private:
+  LoggerStream *debug_;
+  LoggerStream *info_;
+  LoggerStream *warning_;
+  LoggerStream *error_;
 };
 
 #endif // LOGGER_HPP
