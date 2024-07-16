@@ -8,6 +8,7 @@ HttpConnection::HttpConnection(Config &cfg) :config(cfg) {
 HttpConnection::HttpConnection(int fd, ServerConfig &scfg, Config &cfg)  :
     fd(fd), port(scfg.port), host(scfg.host), config(cfg),
     recv_buffer(""), send_buffer(""),
+    header_str(""), body_str(""), content_length(0),
     busy(false), is_connected(true), 
     is_cgi_running(false), 
     cgi_response(""),

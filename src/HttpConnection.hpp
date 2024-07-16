@@ -41,7 +41,10 @@ public:
   Config &config;
   std::string recv_buffer;
   std::string send_buffer;
+  std::string header_str;
+  std::string body_str;
   time_t last_activity;
+  int content_length;
   bool busy;
   bool is_connected;
   bool is_cgi_running;

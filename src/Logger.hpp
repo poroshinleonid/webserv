@@ -20,7 +20,11 @@ public:
 private:
   LoggerStream *get_file_log_stream(const std::string &prefix, const std::string &filename);
 
-  // void log(const std::string message) const;
+  void log_warning(const std::string &log_lvl, const std::string &message) const;
+  void log_debug(const std::string &message) const;
+  void log_info(const std::string &message) const;
+  void log_warning(const std::string &message) const;
+  void log_error(const std::string &message) const;
 public:
   LoggerStream debug;
   LoggerStream info;

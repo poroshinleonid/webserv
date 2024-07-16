@@ -58,8 +58,22 @@ LoggerStream *Logger::get_file_log_stream(const std::string &prefix, const std::
 }
 
 
+void Logger::log_warning(const std::string &log_lvl, const std::string &message) const {
+  std::cout << "[" << log_lvl << "] " << message << std::endl;
+}
 
+void Logger::log_warning(const std::string &message) const {
+  std::cout << "[WARNING] " << message << std::endl;
+}
 
-// void Logger::log(const std::string message) const {
-//   std::cout << message << std::endl;
-// }
+void Logger::log_error(const std::string &message) const {
+  std::cout << "[ERROR] " << message << std::endl;
+}
+
+void Logger::log_info(const std::string &message) const {
+  std::cout << "[INFO] " << message << std::endl;
+}
+
+void Logger::log_debug(const std::string &message) const {
+  std::cout << "[DEBUG] " << message << std::endl;
+}

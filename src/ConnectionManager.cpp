@@ -16,14 +16,17 @@
 #include <poll.h>
 #include <stdlib.h>
 
-ConnectionManager::ConnectionManager(Config &cfg) {
-  config = cfg;
+//FIX
+std::string get_response_string(HttpConnection &connection);
+
+ConnectionManager::ConnectionManager(Config &cfg) : config(cfg) {
+  // config = cfg;
   bzero(buffer, sizeof(buffer));
   bzero(cgi_buffer, sizeof(cgi_buffer));
 }
 
 ConnectionManager::~ConnectionManager() {
-  free(buffer);
+  // free(buffer);
 }
 
 int ConnectionManager::setup(const Config& config) {
@@ -100,29 +103,25 @@ int ConnectionManager::run(const Config& config) {
 // fix handle_ functions return values
 int ConnectionManager::handle_fds(int fd_count) {
   (void)fd_count;
+  int bytes_handled;
   for (int i = 0, sz = fds.size(); i < sz; i++) {
     if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-      if (handle_poll_problem(i) != 0) {
-        break;
-      }
-    }else if (fds[i].revents & POLLIN) {
-      if (handle_poll_read(i) != 0) {
-        break;
-      }
+      handle_poll_problem(i);
+      break;
+    } else if (fds[i].revents & POLLIN) {
+      bytes_handled = handle_poll_read(i);
+      break;
     } else if (fds[i].revents & POLLOUT) {
-      if (handle_poll_write(i) != 0) {
-        break;
-      }
-    } else {
-      //???
+      handle_poll_write(i);
+      break;
     }
-    //handle_timeouts() ??
+    //handle_timeouts() ?? // cleanup() also kills connections with should_die=true
   }
 }
 
 int ConnectionManager::handle_poll_problem(int fd) {
-  // if in listen_fds then handle_accept()
-  std::cout << "ERROR" << std::endl; // FIX
+  // if listen_fd is dead, restart "server" of just kill it and say it died?
+  std::cout << "POLL ERROR" << std::endl; // FIX
 }
 
 int ConnectionManager::handle_poll_read(int fd) {
@@ -133,30 +132,59 @@ int ConnectionManager::handle_poll_read(int fd) {
   connection.busy = true;
   int bytes_recvd = recv(fd, buffer, sizeof(buffer), 0);
   if (bytes_recvd < 0) {
-    //FIX show error, close connection (or set the flag to close it later)
-    connection.should_die = true;
+    //LOG log the error
+    close(fd);
+    connections.erase(fd);
     return -1;
   }
   if (bytes_recvd == 0) {
-    //FIX close connection (or set the flag to close it later)
-    connection.should_die = true;
+    //LOG log that the client said goodbye
+    close(fd);
+    connections.erase(fd);
     return 0;
   }
   connection.recv_buffer.append(buffer);
   bzero(buffer, sizeof(buffer));
   if (!connection.header_is_parsed) {
-    //parse the header
+    size_t header_end_pos;
+    header_end_pos = connection.recv_buffer.find("\r\n\r\n");
+    if (header_end_pos != std::string::npos) {
+      connection.header_str = connection.recv_buffer.substr(0, header_end_pos + 4);
+      //FIX FIND CONTENT-LENGTH AND SET IT
+      //FIX handle chunk send method
+      connection.recv_buffer.erase(0, header_end_pos + 4);
+      connection.header_is_parsed = true;
+    }
   }
+  //now if header is parsed then parse the body
   //if header is parsed and the length of content equals request's content length, set body_is_read = true;
+  if (connection.header_is_parsed && connection.recv_buffer.length() >= connection.content_length) {
+    connection.body_str = connection.recv_buffer.substr(0, connection.content_length);
+    connection.recv_buffer.erase(0, connection.content_length);
+    connection.body_is_read = true;
+  }
 
   if (connection.body_is_read == true) {
+    // std::string get_response_string(const std::string &request_string);
+    connection.send_buffer.append(get_response_string(connection));
     process_request(connection);
   }
-
   return bytes_recvd;
 }
 
 int ConnectionManager::handle_poll_write(int fd) {
+  if (connections[fd].is_cgi_running) {
+    // FIX this shit is blocking right now
+    /*if cgi is running, try getting the input from it
+    which is done in a fucked up blocking synchronous way*/
+
+    return 0;
+  }
+    /*
+  if nothing to send, remove "WRITE" from poll fd events\
+  send the biggest of (default_send_chunk_size, send_buffer.lengt())
+  handle different bytes_read
+  */
   std::cout << "WRITING" << std::endl; // FIX
 
 }
@@ -197,14 +225,16 @@ int ConnectionManager::handle_accept(int fd) {
 
 
 int ConnectionManager::process_request(HttpConnection &connection) {
+  return 0;
   std::cout << "process_request called!" << std::endl;
-  HttpRequest request(connection.recv_buffer); // FIX - this constructor should fill in the request
+  HttpRequest request(connection.recv_buffer);
+  // FIX - this constructor should fill in the request
   //check request validity if request.isValid()
   if (request.is_for_cgi) {
     return run_cgi(connection, request);
   }
   if (connection.cgi_finished) {
-    answer_request_with_string(connection)
+    answer_request_with_string(connection);
   } else {
     answer_request(connection, request);
   }

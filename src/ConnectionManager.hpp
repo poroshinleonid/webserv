@@ -2,6 +2,7 @@
 #define CONNECTIONMANAGER_HPP
 
 #include "Config.hpp"
+#include "Logger.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "HttpConnection.hpp"
@@ -62,6 +63,7 @@ private:
 
 private:
   Config &config;
+  Logger logger;
   std::vector<struct pollfd> fds;
   std::map<int, HttpConnection> connections;
   std::vector<int> listen_fds;
