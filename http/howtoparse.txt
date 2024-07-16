@@ -1,0 +1,32 @@
+split by CRLF (till body)
+start line
+headers
+""
+body
+
+start line:
+    HTTP-Version   = "HTTP" "/" 1*DIGIT "." 1*DIGIT
+    request line:
+        method SP Request-URI SP HTTP-Version CRLF
+        method: OPTIONS GET HEAD POST PUT DELETE TRACE CONNECT extemsopm-method
+        Request-URI    = "*" | absoluteURI | abs_path | authority (fuck this)
+    response line:
+        HTTP-Version SP Status-Code SP Reason-Phrase CRLF
+
+
+headers:
+    https://datatracker.ietf.org/doc/html/rfc2616#section-5.3
+    name:value
+    trim LWS in value
+    save as map: string -> string
+
+
+body:
+    just save as whole i guess
+    calculate body length
+
+Other stuff:
+May be persistent / close unless specified in headers
+
+Implementation:
+classes httprequest & httpresponse wiht methods parse & http_str.
