@@ -174,17 +174,16 @@ int ConnectionManager::handle_poll_read(int fd) {
 
 int ConnectionManager::handle_poll_write(int fd) {
   if (connections[fd].is_cgi_running) {
-    // FIX this shit is blocking right now
-    /*if cgi is running, try getting the input from it
-    which is done in a fucked up blocking synchronous way*/
-
+    /*if cgi is running, try getting the input from it */
+    /* if all read, cgi is gonna die (or do I kill it) and set is_cgi_running = false*/
     return 0;
   }
-    /*
+  /*
   if nothing to send, remove "WRITE" from poll fd events\
   send the biggest of (default_send_chunk_size, send_buffer.lengt())
   handle different bytes_read
   */
+  fds[fd].events |= POLLIN;
   std::cout << "WRITING" << std::endl; // FIX
 
 }
