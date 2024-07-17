@@ -8,6 +8,7 @@
 #include <map>
 #include <iostream>
 #include <vector>
+#include <sstream>
 
 enum connection_state {
   CON_WAIT,
@@ -37,6 +38,7 @@ public:
 public:
   int fd;
   int port;
+  std::stringstream recv_stream;
   std::string host;
   Config &config;
   std::string recv_buffer;
@@ -57,6 +59,7 @@ public:
   bool body_is_read;
   pid_t cgi_pid;
   int cgi_pipe[2];
+  bool is_chunked_transfer;
 };
 
 #endif // HTTPCONNECTION_HPP

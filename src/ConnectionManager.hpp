@@ -69,6 +69,7 @@ private:
   std::vector<int> listen_fds;
   char buffer[4096]; // FIX is it the right size?
   char cgi_buffer[1024]; // FIX is it the right size?
+  std::map<int, int> pipe_to_socket;
 
 
 

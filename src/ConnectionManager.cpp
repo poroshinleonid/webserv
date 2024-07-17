@@ -16,9 +16,6 @@
 #include <poll.h>
 #include <stdlib.h>
 
-//FIX
-std::string get_response_string(HttpConnection &connection);
-
 ConnectionManager::ConnectionManager(Config &cfg) : config(cfg) {
   // config = cfg;
   bzero(buffer, sizeof(buffer));
@@ -124,6 +121,7 @@ int ConnectionManager::handle_poll_problem(int fd) {
   std::cout << "POLL ERROR" << std::endl; // FIX
 }
 
+// make recv buffer for only one request
 int ConnectionManager::handle_poll_read(int fd) {
   if (std::find(listen_fds.begin(), listen_fds.end(), fd) == listen_fds.end()) {
     return handle_accept(fd);
@@ -143,33 +141,43 @@ int ConnectionManager::handle_poll_read(int fd) {
     connections.erase(fd);
     return 0;
   }
-  connection.recv_buffer.append(buffer);
+  connection.recv_stream << buffer;
   bzero(buffer, sizeof(buffer));
-  if (!connection.header_is_parsed) {
-    size_t header_end_pos;
-    header_end_pos = connection.recv_buffer.find("\r\n\r\n");
-    if (header_end_pos != std::string::npos) {
-      connection.header_str = connection.recv_buffer.substr(0, header_end_pos + 4);
-      //FIX FIND CONTENT-LENGTH AND SET IT
-      //FIX handle chunk send method
-      connection.recv_buffer.erase(0, header_end_pos + 4);
-      connection.header_is_parsed = true;
-    }
-  }
-  //now if header is parsed then parse the body
-  //if header is parsed and the length of content equals request's content length, set body_is_read = true;
-  if (connection.header_is_parsed && connection.recv_buffer.length() >= connection.content_length) {
-    connection.body_str = connection.recv_buffer.substr(0, connection.content_length);
-    connection.recv_buffer.erase(0, connection.content_length);
-    connection.body_is_read = true;
-  }
+  // if taaae_fun() runs cgi it changes is_forked,cgi_pid,cgi_pipe[] vars
+  // returns string to_send
+  // if empty string the I do noghing send nogthibg maybe check is_cgi_running
+  // std::string get_responses_string(HttpConnection &connection);
 
-  if (connection.body_is_read == true) {
-    // std::string get_response_string(const std::string &request_string);
-    connection.send_buffer.append(get_response_string(connection));
-    process_request(connection);
-  }
-  return bytes_recvd;
+  // if (connection.is_chunked_transfer) {
+
+  // }
+  // connection.recv_buffer.append(buffer);
+  // bzero(buffer, sizeof(buffer));
+  // if (!connection.header_is_parsed) {
+  //   size_t header_end_pos;
+  //   header_end_pos = connection.recv_buffer.find("\r\n\r\n");
+  //   if (header_end_pos != std::string::npos) {
+  //     connection.header_str = connection.recv_buffer.substr(0, header_end_pos + 4);
+  //     //FIX FIND CONTENT-LENGTH AND SET IT
+  //     //FIX handle chunk send method
+  //     connection.recv_buffer.erase(0, header_end_pos + 4);
+  //     connection.header_is_parsed = true;
+  //   }
+  // }
+  // //now if header is parsed then parse the body
+  // //if header is parsed and the length of content equals request's content length, set body_is_read = true;
+  // if (connection.header_is_parsed && connection.recv_buffer.length() >= connection.content_length) {
+  //   connection.body_str = connection.recv_buffer.substr(0, connection.content_length);
+  //   connection.recv_buffer.erase(0, connection.content_length);
+  //   connection.body_is_read = true;
+  // }
+
+  // if (connection.body_is_read == true) {
+  //   // std::string get_response_string(const std::string &request_string);
+  //   connection.send_buffer.append(get_response_string(connection));
+  //   process_request(connection);
+  // }
+  // return bytes_recvd;
 }
 
 int ConnectionManager::handle_poll_write(int fd) {
