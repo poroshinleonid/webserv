@@ -2,7 +2,7 @@
 #define HTTPCONNECTION_HPP
 
 #include "Config.hpp"
-#include "ServerConfig.hpp"
+#include "Server.hpp"
 
 #include <string>
 #include <map>
@@ -32,7 +32,7 @@ public:
 
 public:
   HttpConnection(Config &cfg);
-  HttpConnection(int fd, ServerConfig &scfg, Config &cfg);
+  HttpConnection(int fd, Server &scfg, Config &cfg);
 
 
 public:

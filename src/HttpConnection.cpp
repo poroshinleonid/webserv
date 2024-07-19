@@ -1,11 +1,11 @@
 #include "HttpConnection.hpp"
-#include "ServerConfig.hpp"
+#include "Server.hpp"
 
 HttpConnection::HttpConnection(Config &cfg) :config(cfg) {
   (void)cfg;
 }
 
-HttpConnection::HttpConnection(int fd, ServerConfig &scfg, Config &cfg)  :
+HttpConnection::HttpConnection(int fd, Server &scfg, Config &cfg)  :
     fd(fd), port(scfg.port), host(scfg.host), config(cfg),
     recv_buffer(""), send_buffer(""),
     header_str(""), body_str(""), content_length(0),

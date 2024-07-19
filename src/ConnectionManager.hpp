@@ -40,6 +40,8 @@ public:
 
 public:
   int setup(const Config& config);
+
+
   int run(const Config& config);
 
   int handle_fds(int fd_count);
@@ -62,14 +64,26 @@ private:
   void update_last_activity(HttpConnection &connection);
 
 private:
+  // system data
   Config &config;
   Logger logger;
+
+  // all fds for poll()
   std::vector<struct pollfd> fds;
+
+  // connections with clients
   std::map<int, HttpConnection> connections;
-  std::vector<int> listen_fds;
+
+  // listening servers
+  // std::vector<int> listen_fds;
+  std::map<int, Server> listen_servers;
+
+  // CGI data
+  std::map<int, int> pipe_to_socket;
+
+  //system buffers
   char buffer[4096]; // FIX is it the right size?
   char cgi_buffer[1024]; // FIX is it the right size?
-  std::map<int, int> pipe_to_socket;
 
 
 

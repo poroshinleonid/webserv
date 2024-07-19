@@ -1,6 +1,7 @@
 #include "Config.hpp"
 #include "ConnectionManager.hpp"
 #include "HttpConnection.hpp"
+#include "Server.hpp"
 
 
 #include <iostream>
@@ -17,63 +18,99 @@
 #include <stdlib.h>
 
 ConnectionManager::ConnectionManager(Config &cfg) : config(cfg) {
-  // config = cfg;
   bzero(buffer, sizeof(buffer));
   bzero(cgi_buffer, sizeof(cgi_buffer));
 }
 
-ConnectionManager::~ConnectionManager() {
-  // free(buffer);
+ConnectionManager::~ConnectionManager() {}
+
+// std::string unwrap(); // returns content string or throws std::invalid_argument
+// std::string get_content();
+// Config operator[](const std::string& key); // gets config by key, throws std::out_of_range if not found, if multiple elements, returns the last one
+// vector<Config> get_vec(const std::string& key); // returns vector of configs (one entry for each key entry)
+
+// FIX
+int ft_atoi(const std::string &s) {
+  return 8080;
+}
+//FIX
+int ft_atoip(const std::string &s) {
+  int result;
+  inet_pton(AF_INET, s.c_str(), &result);
+  return result;
 }
 
-int ConnectionManager::setup(const Config& config) {
-  /* ----- Config init*/
-  // FIX - load the config and use it
-  (void)config;
-  int port_ = 8080;
-  // FIX - assign several listening sockets for different servers
+int add_listen_server(Config &cfg) {
+  Server serv;
+  serv.port = ft_atoi(cfg["port"].unwrap());
+  serv.host = ft_atoip(cfg["host"].unwrap());
+  // server_name
+  // default error pages
+  // client_body_size (??)
+  // for (int i = 0; i < cfg["routes"].length(); i++) {
+  //   routes.append()
+  // }
+
   // FIX - handle errors!
   /* ----- Listening socket init*/
-  int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-  if (listen_fd < 0) {
+  int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+  if (new_listen_fd < 0) {
       perror("socket");
     return (-1);
   }
   struct sockaddr_in server_addr_in;
   server_addr_in.sin_family = AF_INET;
-  server_addr_in.sin_addr.s_addr = INADDR_ANY; // FIX - add real IP that was in the config
-  server_addr_in.sin_port = htons(port_);
+  server_addr_in.sin_addr.s_addr = htons(serv.host); 
+  server_addr_in.sin_port = htons(serv.port);
   memset(&(server_addr_in.sin_zero), '\0', 8);
-
   int opt = 1;
   // FIX - handle errors!
-  if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+  if (setsockopt(new_listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
     perror("setsockopt");
     return (-1);
   }
-
   // FIX - handle errors!
-  if (bind(listen_fd, (struct sockaddr *)&server_addr_in, sizeof(server_addr_in)) < 0) {
+  if (bind(new_listen_fd, (struct sockaddr *)&server_addr_in, sizeof(server_addr_in)) < 0) {
       perror("bind");
       return (-1);
   }
-
-
   std::cout << "I HAVE BINDED THE SERVER\n";
   // FIX - handle errors!
-  // FIX - load data from the config!
-  if (listen(listen_fd, 20) == -1)
-	{
-		perror("listen");
-		return (-1);
-	}
-  this->listen_fds.push_back(listen_fd);
-  struct pollfd poll_fd = {listen_fd, POLLIN, 0};
-  fds.push_back(poll_fd);
+  // FIX - load data about listen backlog from the config or from somewhere!
+  if (listen(new_listen_fd, 20) == -1)
+  {
+    perror("listen");
+    return (-1);
+  }
 
-  std::cout << "SERVER IS LISTENING\n";
-  listen_fds.push_back(listen_fd);
+  // listen_fds.push_back(new_listen_fd);
+  serv.listen_fd = new_listen_fd;
+  listen_servers[serv.listen_fd] = serv;
+  struct pollfd poll_fd = {serv.listen_fd, POLLIN, 0};
+  fds.push_back(poll_fd);
   return 0;
+}
+
+
+int ConnectionManager::setup(const Config& config) {
+  // add logger
+  std::vector<Config> server_configs;
+  server_configs = cfg.get_vec("server");
+  for (int i = 0; i < server_configs.length(); i++) {
+    try {
+      add_listen_server(server_configs[i]);
+    } catch (std:exception &e) {
+      std::cerr << e.what() << std::endl;
+    }
+  }
+  //FIX log and exit
+  if (listen_servers.empty()) {
+    std::cout << "no servers loaded successfully, nothing to do, bye" << std::endl;
+    return -1;
+  }
+  listen_servers[listen_fds[0]].is_default = true;
+
+
 }
 
 int ConnectionManager::run(const Config& config) {
@@ -123,6 +160,8 @@ int ConnectionManager::handle_poll_problem(int fd) {
 
 // make recv buffer for only one request
 int ConnectionManager::handle_poll_read(int fd) {
+  //FIX m.find("f") == m.end()
+  //map instead of vec!
   if (std::find(listen_fds.begin(), listen_fds.end(), fd) == listen_fds.end()) {
     return handle_accept(fd);
   }
@@ -330,3 +369,53 @@ void ConnectionManager::update_last_activity(HttpConnection &connection) {
   //   process_request(connection);
   // }
   // return bytes_recvd;
+
+
+
+
+/*----------   SETUP  ----------*/
+  // (void)config;
+  // int port_ = 8080;
+  // // FIX - assign several listening sockets for different servers
+  // // FIX - handle errors!
+  // /* ----- Listening socket init*/
+  // int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+  // if (listen_fd < 0) {
+  //     perror("socket");
+  //   return (-1);
+  // }
+  // struct sockaddr_in server_addr_in;
+  // server_addr_in.sin_family = AF_INET;
+  // server_addr_in.sin_addr.s_addr = INADDR_ANY; // FIX - add real IP that was in the config
+  // server_addr_in.sin_port = htons(port_);
+  // memset(&(server_addr_in.sin_zero), '\0', 8);
+
+  // int opt = 1;
+  // // FIX - handle errors!
+  // if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+  //   perror("setsockopt");
+  //   return (-1);
+  // }
+
+  // // FIX - handle errors!
+  // if (bind(listen_fd, (struct sockaddr *)&server_addr_in, sizeof(server_addr_in)) < 0) {
+  //     perror("bind");
+  //     return (-1);
+  // }
+
+
+  // std::cout << "I HAVE BINDED THE SERVER\n";
+  // // FIX - handle errors!
+  // // FIX - load data from the config!
+  // if (listen(listen_fd, 20) == -1)
+  // {
+  //  perror("listen");
+  //  return (-1);
+  // }
+  // this->listen_fds.push_back(listen_fd);
+  // struct pollfd poll_fd = {listen_fd, POLLIN, 0};
+  // fds.push_back(poll_fd);
+
+  // std::cout << "SERVER IS LISTENING\n";
+  // listen_fds.push_back(listen_fd);
+  // return 0;
