@@ -20,6 +20,13 @@ void CheckIfInvalid(std::string path) {
     }
 }
 
+void assert_vec_config_eq(std::vector<Config> first, std::vector<std::string> second) {
+    assert(first.size() == second.size());
+    for (int i = 0; i < first.size(); i++) {
+        assert(first[i].get_content() == second[i]);
+    }
+}
+
 
 int main() {
     Config a("ConfigNormal.cfg");
@@ -54,4 +61,9 @@ int main() {
     Config whatever("DublicateValue.cfg"); 
     Config whatever2("DublicateValueDeep.cfg");
     assert(whatever2["a"]["b"]["c"].unwrap() == "g");
+    std::vector<string> expected;
+    expected.push_back("b");
+    expected.push_back("g");
+    assert_vec_config_eq(whatever.get_vec("a"), expected);
+    assert_vec_config_eq(whatever2["a"]["b"].get_vec("c"), expected);
 }

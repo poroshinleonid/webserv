@@ -5,6 +5,7 @@
 #include <fstream>
 
 using std::string;
+using std::vector;
 
 Config::Config(const std::string& filename): depth_(0) {
     std::fstream config_file(filename);
@@ -24,10 +25,27 @@ Config Config::operator[](const std::string& key) {
     catch (InvalidConfig) {
         throw std::out_of_range("Trying to search for a key: \"" + key + "\" in a string that is not an object");
     }
-    if (!is_key_found_) {
+    if (values_found_.empty()) {
         throw std::out_of_range("Key " + key + " not found");
     }
-    return Config(value_found_, true);
+    return Config(values_found_.back(), true);
+}
+
+vector<Config> Config::get_vec(const std::string& key) {
+    try {
+        get_value(key);
+    }
+    catch (InvalidConfig) {
+        throw std::out_of_range("Trying to search for a key: \"" + key + "\" in a string that is not an object");
+    }
+    if (values_found_.empty()) {
+        throw std::out_of_range("Key " + key + " not found");
+    }
+    std::vector<Config> res;
+    for (int i = 0; i < values_found_.size(); i++) {
+        res.push_back(Config(values_found_[i], true));
+    }
+    return res;
 }
 
 std::string Config::unwrap() {
@@ -65,8 +83,7 @@ void Config::throw_if_invalid() {
 
 void Config::get_value(const std::string& s) {
     key_found_ = "";
-    value_found_ = "";
-    is_key_found_ = false;
+    values_found_.clear();
     key_to_find_ = s;
     depth_ = 0;
     eat_obj(content_);
@@ -87,8 +104,7 @@ string Config::eat_obj(const string& s) {
             open_curly--;
         if (open_curly == 0) {
             if (depth_ == 1 && key_found_ == key_to_find_) {
-                is_key_found_ = true;
-                value_found_ = s.substr(0, i + 1);
+                values_found_.push_back(s.substr(0, i + 1));
             }
             search_linklist(s.substr(1, i - 1));
             return s.substr(i + 1);
@@ -135,8 +151,7 @@ string Config::eat_value(const string& s) {
     if (s[0] == '"') {
         int i = s.find('"', 1);
         if (depth_ == 1 && key_found_ == key_to_find_) {
-            is_key_found_ = true;
-            value_found_ = s.substr(1, i - 1);
+            values_found_.push_back(s.substr(1, i - 1));
             key_found_ = "";
         }
         return s.substr(i + 1);
