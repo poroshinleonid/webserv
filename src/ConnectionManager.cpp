@@ -17,24 +17,29 @@
 #include <poll.h>
 #include <stdlib.h>
 
-ConnectionManager::ConnectionManager(Config &cfg) : config(cfg) {
-  bzero(buffer, sizeof(buffer));
-  bzero(cgi_buffer, sizeof(cgi_buffer));
-}
-
-ConnectionManager::~ConnectionManager() {}
+//FIX
+#define CGI_TIMEOUT 100000
 
 // std::string unwrap(); // returns content string or throws std::invalid_argument
 // std::string get_content();
 // Config operator[](const std::string& key); // gets config by key, throws std::out_of_range if not found, if multiple elements, returns the last one
 // vector<Config> get_vec(const std::string& key); // returns vector of configs (one entry for each key entry)
 
+ConnectionManager::ConnectionManager(Config &cfg, Logger &log) : config(cfg), logger(log) {
+  bzero(buffer, sizeof(buffer));
+  bzero(cgi_buffer, sizeof(cgi_buffer));
+}
+
+ConnectionManager::~ConnectionManager() {}
+
+
 // FIX
 int ft_atoi(const std::string &s) {
-  return 8080;
+  return std::stoi(s);
 }
 //FIX
 int ft_atoip(const std::string &s) {
+
   int result;
   inet_pton(AF_INET, s.c_str(), &result);
   return result;
@@ -43,10 +48,11 @@ int ft_atoip(const std::string &s) {
 int add_listen_server(Config &cfg) {
   Server serv;
   serv.port = ft_atoi(cfg["port"].unwrap());
-  serv.host = ft_atoip(cfg["host"].unwrap());
+  serv.host =cfg["host"].unwrap();
   // server_name
   // default error pages
   // client_body_size (??)
+  // FIX somehow parse all of the routes
   // for (int i = 0; i < cfg["routes"].length(); i++) {
   //   routes.append()
   // }
@@ -92,8 +98,7 @@ int add_listen_server(Config &cfg) {
 }
 
 
-int ConnectionManager::setup(const Config& config) {
-  // add logger
+int ConnectionManager::setup() {
   std::vector<Config> server_configs;
   server_configs = cfg.get_vec("server");
   for (int i = 0; i < server_configs.length(); i++) {
@@ -110,14 +115,10 @@ int ConnectionManager::setup(const Config& config) {
   }
   listen_servers[listen_fds[0]].is_default = true;
 
-
 }
 
-int ConnectionManager::run(const Config& config) {
-  (void)config;
-  char buffer[CHUNK_SZ_FIX]; // FIX - buffer size should be dynamic depending on config or idk on something else
-  (void)buffer;
-  std::cout << "Starting select() loop" << std::endl;
+int ConnectionManager::run() {
+  std::cout << "Starting poll() loop" << std::endl;
   // FIX: timeout to poll is probly taken from the config
   while (true) {
     // FIX: set all poll revents to zero!
@@ -127,6 +128,7 @@ int ConnectionManager::run(const Config& config) {
       exit(1);
     }
     if (poll_result == 0) {
+      handle_timeouts();
       continue;
     }
     handle_fds(poll_result);
@@ -134,11 +136,44 @@ int ConnectionManager::run(const Config& config) {
   return 0;
 }
 
+
+void ConnectionManager::update_last_activity(HttpConnection &connection) {
+  time_t new_time;
+  new_time = std::time(&new_time);
+  if (new_time == -1) {
+    return;
+  }
+  connection.last_activity = new_time;
+  return;
+}
+
+
+int ConnectionManager::handle_timeouts(int fd) {
+  //FIX forbidden function
+  HttpConnection &connection = connections[fd];
+  time_t cur_time;
+  time(cur_time);
+  for (int i = 0; i < connection.length(); i++) {
+    if (connection.is_cgi_running && 
+       (cur_time - connection.last_cgi_activity) > CGI_TIMEOUT) {
+      //timeout only CGI
+      ;
+    }
+    if ((cur_time - connection.last_activity) > CONN_TIMEOUT)
+      //timeout the connection
+      ;
+  }
+}
+
 // fix handle_ functions return values
-int ConnectionManager::handle_fds(int fd_count) {
-  (void)fd_count;
+int ConnectionManager::handle_fds() {
+  bool io_happened = false;
   int bytes_handled;
   for (int i = 0, sz = fds.size(); i < sz; i++) {
+    if (io_happened) {
+      check_timeouts(i);
+      continue;
+    }
     if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
       handle_poll_problem(i);
       break;
@@ -197,25 +232,26 @@ int ConnectionManager::handle_poll_write(int fd) {
     /* if all read, cgi is gonna die (or do I kill it) and set is_cgi_running = false*/
     return 0;
   }
+
   /*
   if nothing to send, remove "WRITE" from poll fd events\
   send the biggest of (default_send_chunk_size, send_buffer.lengt())
   handle different bytes_read
   */
-  fds[fd].events |= POLLIN;
+  // fds[fd].events |= POLLIN;
   std::cout << "WRITING" << std::endl; // FIX
-
+  return 0;
 }
 
 int ConnectionManager::handle_accept(int fd) {
+  //FIX: add fd to poll() list, set .events flags
 	sockaddr_in socket_address;
 	socklen_t socket_address_length = sizeof(socket_address);
   int new_fd = accept(fd, (sockaddr *)&socket_address, &socket_address_length);
   if (new_fd == -1) {
     return (-1);
   }
-  HttpConnection connection(config);
-  // FIX do it in the constructor
+  HttpConnection connection(config); //FIX - serverconf instead of general conf
   connection.fd = new_fd;
   connection.port = (int)socket_address.sin_port;
   connection.config = config;
@@ -233,189 +269,10 @@ int ConnectionManager::handle_accept(int fd) {
   connection.cgi_pipe[1] = 0;
   struct pollfd new_pollfd_struct;
   new_pollfd_struct.fd = new_fd;
-  new_pollfd_struct.events = 0;
+  new_pollfd_struct.events = POLLIN | POLLOUT;
   new_pollfd_struct.revents = 0;
   fds.push_back(new_pollfd_struct);
   connections[new_fd] = connection;
   return new_fd;
 
 }
-
-
-int ConnectionManager::process_request(HttpConnection &connection) {
-  return 0;
-  std::cout << "process_request called!" << std::endl;
-  HttpRequest request(connection.recv_buffer);
-  // FIX - this constructor should fill in the request
-  //check request validity if request.isValid()
-  if (request.is_for_cgi) {
-    return run_cgi(connection, request);
-  }
-  if (connection.cgi_finished) {
-    answer_request_with_string(connection);
-  } else {
-    answer_request(connection, request);
-  }
-}
-
-int ConnectionManager::answer_request(HttpConnection &connection, HttpRequest &request) {
-  //forms the writebuffer
-  //calls answer_request_with_string to send the said buffer
-  //if al sent, reset the state, depending on keep-alive and stuff like that
-}
-
-int ConnectionManager::answer_request_with_string(HttpConnection &connection) {
-  //send the cgi_string to the connection
-}
-
-
-int ConnectionManager::run_cgi(HttpConnection &connection, HttpRequest &request) {
-  if (connection.is_cgi_running) {
-    return exec_cgi(connection, request);
-  }
-  std::string cgi_response_tmp = try_read_fork(connection, request);
-  if (cgi_response_tmp == "error of some type") { // FIX: error codenames, etc
-    connection.cgi_response = cgi_response_tmp;
-    return -1;
-  } else if (cgi_response_tmp == "fin") {
-    connection.send_buffer = connection.cgi_response;
-    connection.cgi_response.clear();
-    connection.cgi_finished = true;
-    return 0;
-  }
-  connection.cgi_response.append(cgi_response_tmp);
-  return 0;
-}
-
-int ConnectionManager::exec_cgi(HttpConnection &connection, HttpRequest &request) {
-  pid_t pid = fork();
-  if (pid == -1) {
-    return -1;
-  }
-  if (pid != 0) {
-    connection.cgi_pid = pid;
-    connection.is_cgi_running = true;
-    connection.cgi_finished = false;
-    connection.busy = true;
-    return pid;
-  }
-  // FIX form pipes
-  // FIX actually send something to the script
-  execve("./test/cgi/cgi1.py", NULL, NULL); // FIX cgi path should be stored in config, should it?
-  //4. if child, do prep and send all the necessary data to execve
-  exit(-1);
-}
-
-std::string ConnectionManager::try_read_fork(HttpConnection &connection, HttpRequest &request) {
-  std::string s;
-  //  1. if fork timed out, die
-  //  2. do waitpid() to check the status of the process
-  /*  3. if fork error then handle it
-      if fork WIFEXITED sucessfully, read all of the data in a while loop  to a string (FIX: add hasExited variable to save this and make this string a part of Connection instance)!
-      ofc handle all errors
-      Return the read string*/
-  return s;
-}
-
-
-
-void ConnectionManager::update_last_activity(HttpConnection &connection) {
-  time_t new_time;
-  new_time = std::time(&new_time);
-  if (new_time == -1) {
-    // FIX - log an error, maybe throw an exception and kill the whole connection of the whole server idk
-    return;
-  }
-  connection.last_activity = new_time;
-  return;
-}
-
-
-
-
-/*----------HANDLE FDS----------*/
-  // if taaae_fun() runs cgi it changes is_forked,cgi_pid,cgi_pipe[] vars
-  // returns string to_send
-  // if empty string the I do noghing send nogthibg maybe check is_cgi_running
-  // std::string get_responses_string(HttpConnection &connection);
-
-  // if (connection.is_chunked_transfer) {
-
-  // }
-  // connection.recv_buffer.append(buffer);
-  // bzero(buffer, sizeof(buffer));
-  // if (!connection.header_is_parsed) {
-  //   size_t header_end_pos;
-  //   header_end_pos = connection.recv_buffer.find("\r\n\r\n");
-  //   if (header_end_pos != std::string::npos) {
-  //     connection.header_str = connection.recv_buffer.substr(0, header_end_pos + 4);
-  //     //FIX FIND CONTENT-LENGTH AND SET IT
-  //     //FIX handle chunk send method
-  //     connection.recv_buffer.erase(0, header_end_pos + 4);
-  //     connection.header_is_parsed = true;
-  //   }
-  // }
-  // //now if header is parsed then parse the body
-  // //if header is parsed and the length of content equals request's content length, set body_is_read = true;
-  // if (connection.header_is_parsed && connection.recv_buffer.length() >= connection.content_length) {
-  //   connection.body_str = connection.recv_buffer.substr(0, connection.content_length);
-  //   connection.recv_buffer.erase(0, connection.content_length);
-  //   connection.body_is_read = true;
-  // }
-
-  // if (connection.body_is_read == true) {
-  //   // std::string get_response_string(const std::string &request_string);
-  //   connection.send_buffer.append(get_response_string(connection));
-  //   process_request(connection);
-  // }
-  // return bytes_recvd;
-
-
-
-
-/*----------   SETUP  ----------*/
-  // (void)config;
-  // int port_ = 8080;
-  // // FIX - assign several listening sockets for different servers
-  // // FIX - handle errors!
-  // /* ----- Listening socket init*/
-  // int listen_fd = socket(AF_INET, SOCK_STREAM, 0);
-  // if (listen_fd < 0) {
-  //     perror("socket");
-  //   return (-1);
-  // }
-  // struct sockaddr_in server_addr_in;
-  // server_addr_in.sin_family = AF_INET;
-  // server_addr_in.sin_addr.s_addr = INADDR_ANY; // FIX - add real IP that was in the config
-  // server_addr_in.sin_port = htons(port_);
-  // memset(&(server_addr_in.sin_zero), '\0', 8);
-
-  // int opt = 1;
-  // // FIX - handle errors!
-  // if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-  //   perror("setsockopt");
-  //   return (-1);
-  // }
-
-  // // FIX - handle errors!
-  // if (bind(listen_fd, (struct sockaddr *)&server_addr_in, sizeof(server_addr_in)) < 0) {
-  //     perror("bind");
-  //     return (-1);
-  // }
-
-
-  // std::cout << "I HAVE BINDED THE SERVER\n";
-  // // FIX - handle errors!
-  // // FIX - load data from the config!
-  // if (listen(listen_fd, 20) == -1)
-  // {
-  //  perror("listen");
-  //  return (-1);
-  // }
-  // this->listen_fds.push_back(listen_fd);
-  // struct pollfd poll_fd = {listen_fd, POLLIN, 0};
-  // fds.push_back(poll_fd);
-
-  // std::cout << "SERVER IS LISTENING\n";
-  // listen_fds.push_back(listen_fd);
-  // return 0;

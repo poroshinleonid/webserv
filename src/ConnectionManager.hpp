@@ -39,10 +39,10 @@ public:
 
 
 public:
-  int setup(const Config& config);
+  int setup();
 
 
-  int run(const Config& config);
+  int run();
 
   int handle_fds(int fd_count);
   int handle_poll_problem(int fd);
@@ -66,7 +66,7 @@ private:
 private:
   // system data
   Config &config;
-  Logger logger;
+  Logger &logger;
 
   // all fds for poll()
   std::vector<struct pollfd> fds;

@@ -46,6 +46,7 @@ public:
   std::string header_str;
   std::string body_str;
   time_t last_activity;
+  time_t last_cgi_activity;
   int content_length;
   bool busy;
   bool is_connected;
