@@ -143,41 +143,13 @@ int ConnectionManager::handle_poll_read(int fd) {
   }
   connection.recv_stream << buffer;
   bzero(buffer, sizeof(buffer));
-  // if taaae_fun() runs cgi it changes is_forked,cgi_pid,cgi_pipe[] vars
-  // returns string to_send
-  // if empty string the I do noghing send nogthibg maybe check is_cgi_running
-  // std::string get_responses_string(HttpConnection &connection);
-
-  // if (connection.is_chunked_transfer) {
-
-  // }
-  // connection.recv_buffer.append(buffer);
-  // bzero(buffer, sizeof(buffer));
-  // if (!connection.header_is_parsed) {
-  //   size_t header_end_pos;
-  //   header_end_pos = connection.recv_buffer.find("\r\n\r\n");
-  //   if (header_end_pos != std::string::npos) {
-  //     connection.header_str = connection.recv_buffer.substr(0, header_end_pos + 4);
-  //     //FIX FIND CONTENT-LENGTH AND SET IT
-  //     //FIX handle chunk send method
-  //     connection.recv_buffer.erase(0, header_end_pos + 4);
-  //     connection.header_is_parsed = true;
-  //   }
-  // }
-  // //now if header is parsed then parse the body
-  // //if header is parsed and the length of content equals request's content length, set body_is_read = true;
-  // if (connection.header_is_parsed && connection.recv_buffer.length() >= connection.content_length) {
-  //   connection.body_str = connection.recv_buffer.substr(0, connection.content_length);
-  //   connection.recv_buffer.erase(0, connection.content_length);
-  //   connection.body_is_read = true;
-  // }
-
-  // if (connection.body_is_read == true) {
-  //   // std::string get_response_string(const std::string &request_string);
-  //   connection.send_buffer.append(get_response_string(connection));
-  //   process_request(connection);
-  // }
-  // return bytes_recvd;
+  std::string response_string = get_responses_string(connection);
+  if (response_string.empty()) {
+    //there's no response for whatever reason
+    return bytes_recvd;
+  }
+  connection.response_string.append(response_string);
+  return bytes_recvd;
 }
 
 int ConnectionManager::handle_poll_write(int fd) {
@@ -318,3 +290,43 @@ void ConnectionManager::update_last_activity(HttpConnection &connection) {
   connection.last_activity = new_time;
   return;
 }
+
+
+
+
+/*----------HANDLE FDS----------*/
+  // if taaae_fun() runs cgi it changes is_forked,cgi_pid,cgi_pipe[] vars
+  // returns string to_send
+  // if empty string the I do noghing send nogthibg maybe check is_cgi_running
+  // std::string get_responses_string(HttpConnection &connection);
+
+  // if (connection.is_chunked_transfer) {
+
+  // }
+  // connection.recv_buffer.append(buffer);
+  // bzero(buffer, sizeof(buffer));
+  // if (!connection.header_is_parsed) {
+  //   size_t header_end_pos;
+  //   header_end_pos = connection.recv_buffer.find("\r\n\r\n");
+  //   if (header_end_pos != std::string::npos) {
+  //     connection.header_str = connection.recv_buffer.substr(0, header_end_pos + 4);
+  //     //FIX FIND CONTENT-LENGTH AND SET IT
+  //     //FIX handle chunk send method
+  //     connection.recv_buffer.erase(0, header_end_pos + 4);
+  //     connection.header_is_parsed = true;
+  //   }
+  // }
+  // //now if header is parsed then parse the body
+  // //if header is parsed and the length of content equals request's content length, set body_is_read = true;
+  // if (connection.header_is_parsed && connection.recv_buffer.length() >= connection.content_length) {
+  //   connection.body_str = connection.recv_buffer.substr(0, connection.content_length);
+  //   connection.recv_buffer.erase(0, connection.content_length);
+  //   connection.body_is_read = true;
+  // }
+
+  // if (connection.body_is_read == true) {
+  //   // std::string get_response_string(const std::string &request_string);
+  //   connection.send_buffer.append(get_response_string(connection));
+  //   process_request(connection);
+  // }
+  // return bytes_recvd;
