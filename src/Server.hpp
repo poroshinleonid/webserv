@@ -34,6 +34,8 @@ public:
 public:
   int port;
   std::string host;
+  struct in_addr host_struct;
+  double timeout;
   int listen_fd;
   bool is_default;
   std::string server_name;
