@@ -2,6 +2,8 @@
 
 #include <string>
 #include <vector>
+#include <exception>
+#include <stdexcept> 
 
 using std::string;
 using std::vector;
@@ -38,7 +40,8 @@ class Config
         string key_found_;
         vector<string> values_found_;
 };
-class InvalidConfig: public std::runtime_error {
+
+class InvalidConfig : public std::runtime_error {
 public:
     InvalidConfig(const std::string& msg)
         : std::runtime_error(msg) {

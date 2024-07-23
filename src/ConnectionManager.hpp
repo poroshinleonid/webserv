@@ -34,26 +34,37 @@ private:
 
 
 public:
-  ConnectionManager(Config &cfg);
+  ConnectionManager(Config *cfg, Logger *log);
   ~ConnectionManager();
 
 
 public:
   int setup();
-
+  int setup_server(Server &serv, Config &cfg);
+  int start_server(Server &serv);
+  int add_listen_server(Config &cfg);
+  int cleanup(int fd);
 
   int run();
 
-  int handle_fds(int fd_count);
-  int handle_poll_problem(int fd);
-  int handle_poll_read(int fd);
-  int handle_poll_write(int fd);
-  int handle_accept(int fd);
+  int handle_fds();
+  bool handle_poll_problem(int fd);
+  bool handle_poll_read(int fd);
+  bool handle_poll_write(int fd);
+  void handle_accept(int fd);
 
 private:
   int process_request(HttpConnection &connection);
   int answer_request(HttpConnection &connection, HttpRequest &request);
   int answer_request_with_string(HttpConnection &connection);
+
+private:
+bool handle_cgi_output(HttpConnection &connection);
+void close_connection(int fd);
+bool conn_timed_out(int fd);
+bool cgi_timed_out(int fd);
+void kill_cgi(int fd);
+bool read_cgi_pipe(HttpConnection &connection);
 
 private:
   int run_cgi(HttpConnection &connection, HttpRequest &request);
@@ -65,8 +76,8 @@ private:
 
 private:
   // system data
-  Config &config;
-  Logger &logger;
+  Config *config;
+  Logger *logger;
 
   // all fds for poll()
   std::vector<struct pollfd> fds;

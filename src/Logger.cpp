@@ -1,13 +1,12 @@
 #include "Logger.hpp"
 #include <string>
 #include <iostream>
-#include "LoggerStream.hpp"
 
-Logger::Logger() : out_file_stream_(NULL);
+Logger::Logger() : out_file_stream_(NULL) {}
 
 Logger::Logger (const std::string &log_file) {
-  std::ofstream *out_stream = new out_stream;
-  out_stream->open(log_file.c_str(), ios_base::app);
+  std::ofstream *out_stream = new std::ofstream;
+  out_stream->open(log_file.c_str(), std::ios_base::app);
   if (out_stream->is_open()) {
     out_file_stream_ = out_stream;
     return ;
@@ -25,7 +24,9 @@ Logger::~Logger() {
 
 void Logger::log(const std::string &log_lvl, const std::string &message) const {
   std::cout << "[" << log_lvl << "] " << message << std::endl;
-  *out_file_stream_ << "[" << log_lvl << "] " << message << std::endl;
+  if (out_file_stream_ != NULL) {
+    *out_file_stream_ << "[" << log_lvl << "] " << message << std::endl;
+  }
 
 }
 
