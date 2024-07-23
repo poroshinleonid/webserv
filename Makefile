@@ -5,15 +5,19 @@ INCDIR := inc
 OBJDIR = bin
 TESTDIR := test
 
-CPPFLAGS = -Wall -Wextra -Werror -std=c++98
+CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -g
 DEBUGFLAGS = -g -g -ggdb
 SANADDRFLAG = -fsanitize=address
 INC_FLAGS := -I ./$(INCDIR)
 
 MAINSOURCE := $(SRCDIR)/main.cpp
 SOURCE_FILES := \
-								ServerCore.cpp \
-								Config.cpp
+								Config.cpp \
+								ConnectionManager.cpp \
+								HttpConnection.cpp \
+								Logger.cpp \
+								Server.cpp
+
 
 SOURCES := $(addprefix $(SRCDIR)/,$(SOURCE_FILES))
 OBJECTS = $(addprefix $(OBJDIR)/,$(SOURCE_FILES:.cpp=.o))

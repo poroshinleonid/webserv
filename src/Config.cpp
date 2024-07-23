@@ -3,12 +3,14 @@
 #include <cctype>
 #include <sstream>
 #include <fstream>
+#include <string>
 
 using std::string;
 using std::vector;
 
 Config::Config(const std::string& filename): depth_(0) {
-    std::fstream config_file(filename);
+    std::fstream config_file;
+    config_file.open(filename.c_str());
     if (!config_file.is_open()) {
         throw InvalidConfig("Could not open config file: " + filename);
     }
@@ -22,7 +24,7 @@ Config Config::operator[](const std::string& key) {
     try {
         get_value(key);
     }
-    catch (InvalidConfig) {
+    catch (InvalidConfig &) {
         throw std::out_of_range("Trying to search for a key: \"" + key + "\" in a string that is not an object");
     }
     if (values_found_.empty()) {
@@ -35,14 +37,14 @@ vector<Config> Config::get_vec(const std::string& key) {
     try {
         get_value(key);
     }
-    catch (InvalidConfig) {
+    catch (InvalidConfig &) {
         throw std::out_of_range("Trying to search for a key: \"" + key + "\" in a string that is not an object");
     }
     if (values_found_.empty()) {
         throw std::out_of_range("Key " + key + " not found");
     }
     std::vector<Config> res;
-    for (int i = 0; i < values_found_.size(); i++) {
+    for (size_t i = 0; i < values_found_.size(); i++) {
         res.push_back(Config(values_found_[i], true));
     }
     return res;
@@ -52,7 +54,7 @@ std::string Config::unwrap() {
     try {
         throw_if_invalid();
         throw std::invalid_argument("Config unwrap failed - content is not a string: " + content_);
-    } catch (InvalidConfig) {
+    } catch (InvalidConfig &) {
         return content_;
     }
 }

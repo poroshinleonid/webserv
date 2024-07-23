@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <netinet/in.h>
 
 struct CgiInfo {
   std::string path;
@@ -26,10 +27,12 @@ struct Route {
 
 class	Server {
 public:
-  Server();
   Server(Server const &other);
-  ~Server();
   Server &operator=(const Server &obj);
+  
+public:
+  Server();
+  ~Server();
 
 public:
   int port;

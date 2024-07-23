@@ -2,12 +2,29 @@
 
 Server::Server() {}
 
-Server::Server(Server const &other) : {};
-
 Server::~Server() {}
 
-Server	&Server::operator=(const Server &other) {
-  if (this != &other) {
-  }
-  return (*this);
+Server::Server(Server const &other) 
+:port(other.port), host(other.host), host_struct(other.host_struct),
+timeout(other.timeout), listen_fd(other.listen_fd), is_default(other.is_default),
+server_name(other.server_name), default_error_pages(other.default_error_pages),
+client_body_size(other.client_body_size), routes(other.routes) {
+
+}
+
+Server &Server::operator=(const Server &other) {
+	if (this == &other) {
+		return *this;
+	}
+	port = other.port;
+	host = other.host;
+	host_struct = other.host_struct;
+	timeout = other.timeout;
+	listen_fd = other.listen_fd;
+	is_default = other.is_default;
+	server_name = other.server_name;
+	default_error_pages = other.default_error_pages;
+	client_body_size = other.client_body_size;
+	routes = other.routes;
+	return *this;
 }

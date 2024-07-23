@@ -26,13 +26,13 @@ enum connection_state {
 class	HttpConnection {
 public:
   HttpConnection();
-  HttpConnection(HttpConnection const &other);
   ~HttpConnection();
+  HttpConnection(HttpConnection const &other);
   HttpConnection &operator=(const HttpConnection &obj);
 
 public:
-  HttpConnection(Config &cfg, Server &srv);
-  HttpConnection(int fd, Server &scfg, Config &cfg);
+  HttpConnection(Config *cfg, Server *srv);
+  // HttpConnection(int fd, Server &scfg, Config &cfg);
 
 public:
   void update_last_activity();
@@ -40,8 +40,8 @@ public:
 public:
   int fd;
   std::stringstream recv_stream;
-  Config &config;
-  Server &serv;
+  Config *config;
+  Server *serv;
   std::string recv_buffer;
   std::string send_buffer;
   std::string header_str;
@@ -63,6 +63,7 @@ public:
   pid_t cgi_pid;
   int cgi_pipe[2];
   bool is_chunked_transfer;
+  bool recv_done;
 };
 
 #endif // HTTPCONNECTION_HPP
