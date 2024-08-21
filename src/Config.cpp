@@ -160,3 +160,29 @@ string Config::eat_value(const string& s) {
     }
     return eat_obj(s);
 }
+
+unsigned long Config::string_to_ip(const std::string &ip_string){
+
+  if (ip_string == "localhost") {
+    return string_to_ip("127.0.0.1");
+  }
+  if (ip_string == "default") {
+    return INADDR_ANY;
+  }
+  unsigned long s_addr = 0;
+  int cur_8_bits;
+  char dummy;
+  std::istringstream ip_stream(ip_string);
+
+  for (int i = 0; i < 4; ++i) {
+    if (!(ip_stream >> cur_8_bits) && cur_8_bits < 0 && cur_8_bits >= 256) {
+      throw InvalidConfig("Incorrect ip address: " + ip_string);
+      return 0;
+    }
+    s_addr <<= 8;
+    s_addr += cur_8_bits;
+    if (!(ip_stream >> dummy)) {
+      throw InvalidConfig("Incorrect ip address: " + ip_string);
+    }
+  }
+}

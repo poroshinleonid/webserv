@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <signal.h>
 
 std::string get_responses_string(HttpConnection &connection) {
   (void)connection;
@@ -72,6 +73,7 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 
   serv.port = ft_atoi(cfg["port"].unwrap());
   serv.host = cfg["host"].unwrap();
+  host_struct.s_addr = Config::string_to_ip(serv.host);
   serv.timeout = 1000; // ft_atoi(cfg["timeout"].unwrap());
   // server_name
   // default error pages
@@ -92,7 +94,7 @@ int ConnectionManager::start_server(Server &serv) {
   }
   struct sockaddr_in server_addr_in;
   server_addr_in.sin_family = AF_INET;
-  server_addr_in.sin_addr.s_addr = INADDR_ANY; //FIX htonl(serv.host_struct); 
+  server_addr_in.sin_addr.s_addr = serv.host_struct.s_addr; //FIX htonl(serv.host_struct); 
   server_addr_in.sin_port = htons(serv.port);
   memset(&(server_addr_in.sin_zero), '\0', 8);
   int opt = 1;
@@ -192,7 +194,7 @@ int ConnectionManager::handle_fds() {
     int fd = fds[i].fd;
     if (io_happened) {
       cleanup(fd);
-    } else if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+    } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
       io_happened = handle_poll_problem(fd);
     } else if (fds[i].revents & POLLIN) {
       io_happened = handle_poll_read(fd);
@@ -221,7 +223,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   }
   if (listen_servers.find(fd) != listen_servers.end()) {
     handle_accept(fd);
-    return false;
+    return true;
   }
   if (pipe_to_socket.find(fd) != pipe_to_socket.end()) {
     return handle_cgi_output(connections[fd]);
@@ -239,7 +241,6 @@ bool ConnectionManager::handle_poll_read(int fd) {
     return true;
   }
   if (bytes_recvd == 0) {
-
     logger->log_info("socket " + ft_itos(fd) + "hung up.");
     // close if not keep-alive!
     close_connection(fd);
@@ -271,20 +272,25 @@ void ConnectionManager::handle_accept(int fd) {
     logger->log_error("Failed to accept a new connection on socket" + ft_itos(fd));
     return;
   }
+
+  
   std::cout << "ACCEPTED SOCKET " << fd <<", new one is " << new_fd << std::endl;
 
-
+  // FIX - crasheson thisparagraph
   struct pollfd new_pollfd_struct;
   new_pollfd_struct.fd = new_fd;
   new_pollfd_struct.events = POLLIN | POLLOUT;
   new_pollfd_struct.revents = 0;
   fds.push_back(new_pollfd_struct);
-
+  // write(STDOUT_FILENO, "A", 1);
+  // printf("SDFSFSDF");
+  // std::cout << "EEEEEE";
   HttpConnection connection(config, &listen_servers[fd]);
   connection.fd = new_fd;
   connection.update_last_activity();
   connections[new_fd] = connection;
   fds[fd].revents = 0;
+
 }
 
 

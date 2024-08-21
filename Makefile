@@ -5,7 +5,7 @@ INCDIR := inc
 OBJDIR = bin
 TESTDIR := test
 
-CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -g
+CPPFLAGS = -Wall -Wextra -Werror -std=c++98 -g -ggdb
 DEBUGFLAGS = -g -g -ggdb
 SANADDRFLAG = -fsanitize=address
 INC_FLAGS := -I ./$(INCDIR)
