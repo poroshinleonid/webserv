@@ -73,11 +73,11 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 
   serv.port = ft_atoi(cfg["port"].unwrap());
   serv.host = cfg["host"].unwrap();
-  host_struct.s_addr = Config::string_to_ip(serv.host);
+  serv.host_struct.s_addr = Config::string_to_ip(serv.host);
   serv.timeout = 1000; // ft_atoi(cfg["timeout"].unwrap());
   // server_name
   // default error pages
-  // client_body_size (??)
+  // limit client_body_size (??)
   // FIX somehow parse all of the routes
   // for (int i = 0; i < cfg["routes"].length(); i++) {
   //   routes.append()
@@ -88,13 +88,13 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 int ConnectionManager::start_server(Server &serv) {
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (new_listen_fd < 0) {
-    std::string error = "can't create socket" + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
+    std::string error = "can't create socket " + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     return (-1);
   }
   struct sockaddr_in server_addr_in;
   server_addr_in.sin_family = AF_INET;
-  server_addr_in.sin_addr.s_addr = serv.host_struct.s_addr; //FIX htonl(serv.host_struct); 
+  server_addr_in.sin_addr.s_addr = htonl(serv.host_struct.s_addr); //FIX htonl(serv.host_struct); 
   server_addr_in.sin_port = htons(serv.port);
   memset(&(server_addr_in.sin_zero), '\0', 8);
   int opt = 1;
@@ -105,7 +105,7 @@ int ConnectionManager::start_server(Server &serv) {
     return (-1);
   }
   if (bind(new_listen_fd, (struct sockaddr *)&server_addr_in, sizeof(server_addr_in)) < 0) {
-    std::string error = "can't create socket" + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
+    std::string error = "can't bind socket " + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     close(new_listen_fd);
       return (-1);

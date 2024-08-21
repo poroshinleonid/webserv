@@ -13,7 +13,7 @@ struct CgiInfo {
 
 struct Route {
   std::string route_string;
-  std::vector<std::string> methods; // FIX - add enum
+  std::vector<std::string> methods;
   bool is_redirected;
   std::string redirection;
   std::string root_directory; 

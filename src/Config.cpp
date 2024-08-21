@@ -5,6 +5,10 @@
 #include <fstream>
 #include <string>
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
 using std::string;
 using std::vector;
 
@@ -175,14 +179,15 @@ unsigned long Config::string_to_ip(const std::string &ip_string){
   std::istringstream ip_stream(ip_string);
 
   for (int i = 0; i < 4; ++i) {
-    if (!(ip_stream >> cur_8_bits) && cur_8_bits < 0 && cur_8_bits >= 256) {
+    if (!(ip_stream >> cur_8_bits) || cur_8_bits < 0 || cur_8_bits >= 256) {
       throw InvalidConfig("Incorrect ip address: " + ip_string);
       return 0;
     }
     s_addr <<= 8;
     s_addr += cur_8_bits;
-    if (!(ip_stream >> dummy)) {
+    if (!(ip_stream >> dummy) && i < 3) {
       throw InvalidConfig("Incorrect ip address: " + ip_string);
     }
   }
+  return s_addr;
 }
