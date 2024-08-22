@@ -22,7 +22,8 @@ class Config
 
         Config(const std::string& filename); /* parses config from a file and 
         throws if failed to open/failed to parse */
-    static unsigned long string_to_ip(const std::string &ip_string);
+    bool key_exists(const std::string &key) const;
+    static unsigned long string_to_ip(const std::string &ip_string) const;
         // idk if I need copy/assignment etc
     private:
         Config(const std::string& content, bool /* dummy */);

@@ -45,6 +45,7 @@ vector<Config> Config::get_vec(const std::string& key) {
         throw std::out_of_range("Trying to search for a key: \"" + key + "\" in a string that is not an object");
     }
     if (values_found_.empty()) {
+        //change to returning empty vector?
         throw std::out_of_range("Key " + key + " not found");
     }
     std::vector<Config> res;
@@ -165,7 +166,11 @@ string Config::eat_value(const string& s) {
     return eat_obj(s);
 }
 
-unsigned long Config::string_to_ip(const std::string &ip_string){
+bool Config::key_exists(const std::string &key) const {
+    return true;
+}
+
+unsigned long Config::string_to_ip(const std::string &ip_string) const{
 
   if (ip_string == "localhost") {
     return string_to_ip("127.0.0.1");
