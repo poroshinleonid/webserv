@@ -4,6 +4,7 @@
 #include <vector>
 #include <exception>
 #include <stdexcept> 
+#include <map>
 
 using std::string;
 using std::vector;
@@ -22,9 +23,10 @@ class Config
 
         Config(const std::string& filename); /* parses config from a file and 
         throws if failed to open/failed to parse */
-    bool key_exists(const std::string &key) const;
-    static unsigned long string_to_ip(const std::string &ip_string) const;
-        // idk if I need copy/assignment etc
+        bool key_exists(const std::string &key);
+        std::map<string, string> get_content_dict();
+        static unsigned long string_to_ip(const std::string &ip_string);
+            // idk if I need copy/assignment etc
     private:
         Config(const std::string& content, bool /* dummy */);
         static string remove_spaces(const string& s);

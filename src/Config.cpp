@@ -4,6 +4,7 @@
 #include <sstream>
 #include <fstream>
 #include <string>
+#include <iostream>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -44,11 +45,11 @@ vector<Config> Config::get_vec(const std::string& key) {
     catch (InvalidConfig &) {
         throw std::out_of_range("Trying to search for a key: \"" + key + "\" in a string that is not an object");
     }
-    if (values_found_.empty()) {
-        //change to returning empty vector?
-        throw std::out_of_range("Key " + key + " not found");
-    }
     std::vector<Config> res;
+    if (values_found_.empty()) {
+      return res;
+        // throw std::out_of_range("Key " + key + " not found");
+    }
     for (size_t i = 0; i < values_found_.size(); i++) {
         res.push_back(Config(values_found_[i], true));
     }
@@ -166,11 +167,75 @@ string Config::eat_value(const string& s) {
     return eat_obj(s);
 }
 
-bool Config::key_exists(const std::string &key) const {
-    return true;
+bool Config::key_exists(const std::string &key) {
+  return get_vec(key).empty();
 }
 
-unsigned long Config::string_to_ip(const std::string &ip_string) const{
+std::map<string, string> Config::get_content_dict() {
+    std::map<string, string> content;
+    bool in_quote = false;
+    bool is_key = true;
+    int curly_depth = 0;
+    std::string key, value;
+
+    for (size_t i = 1; i < content_.size(); ++i) {
+        char c = content_[i];
+        if (c == '"') {
+            in_quote = !in_quote;
+            continue;
+        }
+        if (in_quote) {
+            if (is_key) {
+                key += c;
+            } else {
+                value += c;
+            }
+        } else {
+            if (c == ':') {
+                is_key = false;
+            } else if (c == ',') {
+                if (!key.empty() && !value.empty()) {
+                    content[key] = value;
+                }
+                key.clear();
+                value.clear();
+                is_key = true;
+            } else if (c == '}') {
+                if (!key.empty() && !value.empty()) {
+                    content[key] = value;
+                }
+                break;
+            } 
+            else if (!is_key && !in_quote && c == '{' && value.empty()) {
+              std::cout << "[";
+              curly_depth = 1;
+              value += content_[i];
+              ++i;
+              while (i < content_.size()) {
+                std::cout << content_[i];
+                if (content_[i] == '{') {
+                  curly_depth += 1;
+                  // std::cout << "(" << curly_depth << ")";
+                }
+                if (content_[i] == '}') {
+                  curly_depth -= 1;
+                  // std::cout << "(" << curly_depth << ")";
+                }
+                value += content_[i];
+                if (curly_depth == 0) {
+                  break;
+                }
+                ++i;
+              }
+              std::cout << "]";
+              continue;
+            }
+        }
+    }
+    return content;
+}
+
+unsigned long Config::string_to_ip(const std::string &ip_string){
 
   if (ip_string == "localhost") {
     return string_to_ip("127.0.0.1");
