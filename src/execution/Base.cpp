@@ -6,9 +6,10 @@
 
 std::string ltrim(const std::string &s) {
     std::string s_cp = s;
-    s_cp.erase(s.begin(), std::find_if(s_cp.begin(), s_cp.end(), [](unsigned char ch) {
+    s_cp.erase(s_cp.begin(), std::find_if(s_cp.begin(), s_cp.end(), [](unsigned char ch) {
         return !std::isspace(ch);
     }));
+    return s_cp;
 }
 
 std::string rtrim(const std::string &s) {

@@ -2,6 +2,7 @@
 #include "Base.hpp"
 
 #define CRLF "\r\n"
+#define SP ' '
 
 using std::string, std::stringstream, std::unordered_map;
 
@@ -32,16 +33,17 @@ namespace {
 
 HttpRequest::HttpRequest(stringstream& stream) {
     string line;
-
     getline_str(stream, line, CRLF);
-    if (line.find('/') == string::npos) {
+    size_t method_end = line.find(SP);
+    size_t url_start = method_end;
+    for (; url_start < line.size() && line[url_start] == ' '; url_start++) {}
+    size_t url_end = line.find(SP, url_start);
+    if (method_end == string::npos || url_end == string::npos) {
         throw BadRequest("Bad request header");
     }
-    method_ = ::get_method(trim(line.substr(0, line.find('/'))));
-    check_http_version(trim(line.substr(line.find('/') + 1)));
-    for (; stream >> line; line != CRLF) {
-
-    }
+    method_ = ::get_method(line.substr(0, method_end));
+    url_ = trim(line.substr(url_start, url_end - url_start));
+    check_http_version(trim(line.substr(url_end + 1)));
     while (true) {
         getline_str(stream, line, CRLF);
         if (line == "") {
@@ -64,7 +66,21 @@ HttpRequest::HttpRequest(stringstream& stream) {
     body_ = body;
 }
 
+HttpRequest::Method HttpRequest::get_method() {
+    return method_;
+}
 
+string HttpRequest::get_url() {
+    return url_;
+}
+
+string HttpRequest::get_body() {
+    return body_;
+}
+
+string HttpRequest::get_header_at(const string& s) {
+    return headers_.at(s);
+}
 
 // bad request exception //
 

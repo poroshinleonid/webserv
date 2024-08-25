@@ -17,10 +17,12 @@ class HttpRequest {
     ~HttpRequest() = default;
 
     Method get_method();
-    string operator[](const string& s);
+    string get_url();
+    string get_header_at(const string& s);
     string get_body();
   private:
     Method method_ = Method::GET;
+    string url_;
     std::unordered_map<string, string> headers_;
     string body_;
   public:
@@ -30,3 +32,4 @@ class HttpRequest {
             virtual char const* what() const throw();
     };
 };
+
