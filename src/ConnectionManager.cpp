@@ -8,6 +8,7 @@
 #include <vector>
 #include <cstring>
 #include <algorithm>
+#include <sstream>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -71,13 +72,44 @@ std::string ft_itos(int number) {
 
 int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 
-  serv.port = ft_atoi(cfg["port"].unwrap());
-  serv.host = cfg["host"].unwrap();
-  serv.host_struct.s_addr = Config::string_to_ip(serv.host);
-  serv.timeout = 1000; // ft_atoi(cfg["timeout"].unwrap());
-  // server_name
-  // default error pages
-  // limit client_body_size (??)
+  // 1. Choose the port and host of each ’server’.
+  serv.srv_sockaddr.sin_family = AF_INET;
+  serv.srv_sockaddr.sin_port = ft_atoi(cfg["port"].unwrap());
+  serv.srv_sockaddr.sin_addr.s_addr = Config::string_to_ip(cfg["host"].unwrap());
+  bzero(serv.srv_sockaddr.sin_zero, 8);
+  serv.host = serv.srv_sockaddr.sin_addr.s_addr;
+  serv.port = serv.srv_sockaddr.sin_port;
+
+  // 2. Setup the server_names or not.
+  // 3. The first server for a host:port will be the default for this host:port (that means it will answer to all the requests that don’t belong to an other server).
+  std::istringstream iss(cfg["server_name"].unwrap());
+  std::string srv_name;
+  while (iss >> srv_name) {
+    serv.server_names.push_back(srv_name);
+  }
+
+  // 4. Setup default error pages.
+  std::vector<Config> error_pages = cfg.get_vec("default_page");
+  for (int i = 0; i < error_pages.size(); i++) {
+    ErrorPage page;
+    page.page_code = ft_atoi(error_pages[i]["code"].unwrap());
+    page.html_file = error_pages[i]["html_file"].unwrap();
+    page.location = error_pages[i]["location"].unwrap();
+    page.internal = error_pages[i]["internal"].unwrap() == "true";
+    serv.error_pages.push_back(page);
+  }
+
+  // 5. Limit client body size.
+  if (cfg.key_exists("client_max_body_size")) {
+    serv.client_max_body_size = ft_atoi(cfg["client_max_body_size"].unwrap());
+  } else {
+    serv.client_body_size = Config::client_default_max_body_size;
+  }
+  serv.timeout = ft_atoi(cfg["timeout"].unwrap());
+  // 6. Setup routes with one or multiple of the following rules/configuration
+  1. get_vec routes
+  2. for each cfg in vector parse it and push_back the result to Server.routes (which is a vector);
+
   // FIX somehow parse all of the routes
   // for (int i = 0; i < cfg["routes"].length(); i++) {
   //   routes.append()
@@ -94,7 +126,7 @@ int ConnectionManager::start_server(Server &serv) {
   }
   struct sockaddr_in server_addr_in;
   server_addr_in.sin_family = AF_INET;
-  server_addr_in.sin_addr.s_addr = htonl(serv.host_struct.s_addr); //FIX htonl(serv.host_struct); 
+  server_addr_in.sin_addr.s_addr = htonl(serv.srv_sockaddr.sin_addr.s_addr); //FIX htonl(serv.host_struct); 
   server_addr_in.sin_port = htons(serv.port);
   memset(&(server_addr_in.sin_zero), '\0', 8);
   int opt = 1;

@@ -19,7 +19,7 @@ class Config
         std::string unwrap(); // returns content string or throws std::invalid_argument
         std::string get_content();
         Config operator[](const std::string& key); // gets config by key, throws std::out_of_range if not found, if multiple elements, returns the last one
-        vector<Config> get_vec(const std::string& key); // returns vector of configs (one entry for each key entry)
+        vector<Config> get_vec(const std::string& key); // returns vector of configs (one entry for each key entry). doesn not throw if vec is empty
 
         Config(const std::string& filename); /* parses config from a file and 
         throws if failed to open/failed to parse */
@@ -42,6 +42,9 @@ class Config
         string key_to_find_;
         string key_found_;
         vector<string> values_found_;
+
+    public:
+     const static int client_default_max_body_size = 1<<15; // 32K
 };
 
 class InvalidConfig : public std::runtime_error {
