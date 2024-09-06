@@ -4,11 +4,11 @@
 #include "Config.hpp"
 #include "Server.hpp"
 
-#include <string>
-#include <map>
 #include <iostream>
-#include <vector>
+#include <map>
 #include <sstream>
+#include <string>
+#include <vector>
 
 enum connection_state {
   CON_WAIT,
@@ -23,7 +23,7 @@ enum connection_state {
   CON_CLOSED,
 };
 
-class	HttpConnection {
+class HttpConnection {
 public:
   HttpConnection();
   ~HttpConnection();
@@ -65,13 +65,11 @@ public:
   bool is_chunked_transfer;
   bool recv_done;
 
-# define DEBUG
-# ifdef DEBUG
+#define DEBUG
+#ifdef DEBUG
 public:
   void print_connection();
-# endif
-
+#endif
 };
-
 
 #endif // HTTPCONNECTION_HPP

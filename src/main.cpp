@@ -1,16 +1,16 @@
 #include "Config.hpp"
-#include "Logger.hpp"
 #include "ConnectionManager.hpp"
+#include "Logger.hpp"
 #include <iostream>
-#include <string>
 #include <map>
+#include <string>
 #include <vector>
 
 #define DEBUG
 
-int main(int argc, char **argv){
+int main(int argc, char **argv) {
   if (argc != 2) {
-  std::cout << "gib args (conf file)\n";
+    std::cout << "gib args (conf file)\n";
 
     return -1;
   }
@@ -38,5 +38,5 @@ int main(int argc, char **argv){
   std::cout << "Running server" << std::endl;
   main_connection.run();
 
-  return(0);
+  return (0);
 }
