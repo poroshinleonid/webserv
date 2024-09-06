@@ -1,4 +1,7 @@
-0. make format(create the rule and run it), re-read all of the code, cleanup the directories form any files that I don't need'
+0. make format(create the rule and run it), re-read all of the code, cleanup the directories from any files that I don't need'
+if start_server() is called for 2nd time and returns -1, is the first server cleaned up?
+or does this event not even cause the program to terminate?
+
 
 1. Make a list of timeouts that I need to keep track of
 2. Decide where to store each timeout and respective timer
@@ -19,7 +22,9 @@
 
 
 
-
+write:
+1. ft_htonl
+2. terminate() function that cleans everything up. Call it from main after calling run().
 
 
 

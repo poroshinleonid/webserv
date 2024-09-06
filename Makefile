@@ -37,6 +37,13 @@ sanaddr: CPPFLAGS += $(SANADDRFLAG)
 sanaddr: debug all
 
 
+HEADERS = $(addprefix $(SRCDIR)/,$(SOURCE_FILES:.cpp=.hpp))
+format:
+	clang-format -Werror -i --style=LLVM $(SOURCES)
+	clang-format -Werror -i --style=LLVM $(MAINSOURCE)
+	clang-format -Werror -i --style=LLVM $(HEADERS)
+
+
 clean:
 	rm -f $(OBJECTS)
 
