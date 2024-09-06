@@ -64,32 +64,12 @@ class	Server {
     std::map<int, std::string> default_error_pages;
     size_t client_body_size;
 
+# define DEBUG
+# ifdef DEBUG
+public:
+  void print_server();
+# endif
+
 };
 
 #endif
-
-
-// 1. Choose the port and host of each ’server’.
-  struct sockaddr_in srv_sockaddr; {
-    short            sin_family;   // e.g. AF_INET
-    unsigned short   sin_port;     // e.g. htons(3490)
-    struct in_addr   sin_addr;     // see struct in_addr, below
-    char             sin_zero[8];  // zero this if you want to
-};
-// 2. Setup the server_names or not.
-
-
-3. The first server for a host:port will be the default for this host:port (that means it will answer to all the requests that don’t belong to an other server).
-4. Setup default error pages.
-5. Limit client body size.
-6. Setup routes with one or multiple of the following rules/configuration (routes wont
-be using regexp):
-  6.1 Define a list of accepted HTTP methods for the route.
-  6.2 Define a HTTP redirection.
-  6.3 Define a directory or a file from where the file should be searched (for example, if url /kapouet is rooted to /tmp/www, url /kapouet/pouic/toto/pouet is /tmp/www/pouic/toto/pouet).
-  6.4 Turn on or off directory listing.
-  6.5 Set a default file to answer if the request is a directory.
-  6.6 Execute CGI based on certain file extension (for example .php).
-  6.7 Make it work with POST and GET methods.
-  6.8 Make the route able to accept uploaded files and configure where they should
-be saved.
