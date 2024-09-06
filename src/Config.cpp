@@ -168,7 +168,7 @@ string Config::eat_value(const string& s) {
 }
 
 bool Config::key_exists(const std::string &key) {
-  return get_vec(key).empty();
+  return !get_vec(key).empty();
 }
 
 std::map<string, string> Config::get_content_dict() {
@@ -260,4 +260,21 @@ unsigned long Config::string_to_ip(const std::string &ip_string){
     }
   }
   return s_addr;
+}
+
+std::vector<std::string> Config::split_string(const std::string &s) {
+  std::vector<std::string> result;
+  std::istringstream iss(s);
+  std::string tmp_s;
+  while (iss >> tmp_s) {
+    result.push_back(tmp_s);
+  }
+  return result;
+}
+
+std::string Config::get_value_safely(const std::string &s) {
+  if (key_exists(s)) {
+    return (*this)[s].get_content();
+  }
+  return ("");
 }

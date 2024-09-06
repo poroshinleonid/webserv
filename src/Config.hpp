@@ -26,6 +26,8 @@ class Config
         bool key_exists(const std::string &key);
         std::map<string, string> get_content_dict();
         static unsigned long string_to_ip(const std::string &ip_string);
+        static std::vector<std::string> split_string(const std::string &s);
+        std::string get_value_safely(const std::string &s);
             // idk if I need copy/assignment etc
     private:
         Config(const std::string& content, bool /* dummy */);
