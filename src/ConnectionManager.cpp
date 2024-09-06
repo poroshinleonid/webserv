@@ -1,43 +1,42 @@
-#include "Config.hpp"
 #include "ConnectionManager.hpp"
+#include "Config.hpp"
 #include "HttpConnection.hpp"
 #include "Server.hpp"
 
+#include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <map>
-#include <vector>
-#include <cstring>
-#include <algorithm>
 #include <sstream>
+#include <vector>
 
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <poll.h>
-#include <stdlib.h>
 #include <ctime>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <poll.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/wait.h>
-#include <stdlib.h>
-#include <signal.h>
+#include <unistd.h>
 
 std::string get_responses_string(HttpConnection &connection) {
   (void)connection;
   return "HTTP/1.1 200 OK\r\n"
-                                              "Content-Type: text/plain\r\n"
-                                              "Content-Length: 12\r\n"
-                                              "\r\n"
-                                              "Hello world!";
+         "Content-Type: text/plain\r\n"
+         "Content-Length: 12\r\n"
+         "\r\n"
+         "Hello world!";
 }
 
-//FIX: is std::time even allowed?
-//FIX
+// FIX
 #define CGI_TIMEOUT 100000
 #define CONN_TIMEOUT 100000
 
-ConnectionManager::ConnectionManager(Config *cfg, Logger *log) : config(cfg), logger(log) {
+ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
+    : config(cfg), logger(log) {
   bzero(buffer, sizeof(buffer));
   bzero(cgi_buffer, sizeof(cgi_buffer));
 }
@@ -48,17 +47,14 @@ ConnectionManager::~ConnectionManager() {
   }
 }
 
-
-int ft_atoi(const std::string &s) {
-// FIX
+// returns 0 if empty string
+int ft_atoi(const std::string &s) { // FIX - move helper functions somewhere where they belong
   return std::atoi(s.c_str());
 }
 
 int ft_atoip(const std::string &s) {
-//FIX
-
   int result;
-  inet_pton(AF_INET, s.c_str(), &result);
+  inet_pton(AF_INET, s.c_str(), &result); // FIX forbidden function
   return result;
 }
 
@@ -71,104 +67,117 @@ std::string ft_itos(int number) {
 }
 
 int ConnectionManager::setup_server(Server &serv, Config &cfg) {
-try {
-  // 1. Choose the port and host of each ’server’.
-  serv.srv_sockaddr.sin_family = AF_INET;
-  serv.srv_sockaddr.sin_port = ft_atoi(cfg["port"].unwrap());
-  serv.srv_sockaddr.sin_addr.s_addr = Config::string_to_ip(cfg["host"].unwrap());
-  bzero(serv.srv_sockaddr.sin_zero, 8);
-  serv.host = serv.srv_sockaddr.sin_addr.s_addr;
-  serv.port = serv.srv_sockaddr.sin_port;
+  try {
+    // 1. Choose the port and host of each ’server’.
+    serv.srv_sockaddr.sin_family = AF_INET;
+    serv.srv_sockaddr.sin_port = ft_atoi(cfg["port"].unwrap());
+    serv.srv_sockaddr.sin_addr.s_addr =
+        Config::string_to_ip(cfg["host"].unwrap());
+    bzero(serv.srv_sockaddr.sin_zero, 8); // FIX: forbidden fun
+    serv.host = serv.srv_sockaddr.sin_addr.s_addr;
+    serv.port = serv.srv_sockaddr.sin_port;
 
-  // 2. Setup the server_names or not.
-  // 3. The first server for a host:port will be the default for this host:port (that means it will answer to all the requests that don’t belong to an other server).
-  // std::istringstream iss(cfg["server_name"].unwrap());
-  // std::string srv_name;
-  // while (iss >> srv_name) {
-  //   serv.server_names.push_back(srv_name);
-  // }
-  serv.server_names = Config::split_string(cfg["server_name"].unwrap());
+    // 2. Setup the server_names or not.
+    // 3. The first server for a host:port will be the default for this
+    // host:port (that means it will answer to all the requests that don’t
+    // belong to an other server). std::istringstream
+    // iss(cfg["server_name"].unwrap()); std::string srv_name; while (iss >>
+    // srv_name) {
+    //   serv.server_names.push_back(srv_name);
+    // }
+    serv.server_names = Config::split_string(cfg.get_value_safely("server_name"));
 
+    // 4. Setup default error pages.
+    std::vector<Config> error_pages = cfg.get_vec("default_page");
+    for (size_t i = 0; i < error_pages.size(); i++) {
+      ErrorPage page;
+      page.page_code = ft_atoi(error_pages[i]["code"].unwrap());
+      page.html_file = error_pages[i]["html_file"].unwrap();
+      page.location = error_pages[i]["location"].unwrap();
+      std::string tmp = error_pages[i].get_value_safely("internal");
+      page.internal =  tmp == "true"|| tmp == "";
+      serv.error_pages.push_back(page);
+    }
 
-  // 4. Setup default error pages.
-  std::vector<Config> error_pages = cfg.get_vec("default_page");
-  for (size_t i = 0; i < error_pages.size(); i++) {
-    ErrorPage page;
-    page.page_code = ft_atoi(error_pages[i]["code"].unwrap());
-    page.html_file = error_pages[i]["html_file"].unwrap();
-    page.location = error_pages[i]["location"].unwrap();
-    page.internal = error_pages[i]["internal"].unwrap() == "true";
-    serv.error_pages.push_back(page);
-  }
+    // 5. Limit client body size.
+    serv.client_max_body_size = ft_atoi(cfg.get_value_safely("client_max_body_size"));
+    if (serv.client_body_size == 0) {
+      serv.client_body_size = Config::client_default_max_body_size;
+    }
 
-  // 5. Limit client body size.
-  if (cfg.key_exists("client_max_body_size")) {
-    serv.client_max_body_size = ft_atoi(cfg["client_max_body_size"].unwrap());
-  } else {
-    serv.client_body_size = Config::client_default_max_body_size;
-  }
-  // serv.timeout = ft_atoi(cfg["timeout"].unwrap());
-  // 6. Setup routes with one or multiple of the following rules/configuration
-  // 1. get_vec routes
-  // 2. for each cfg in vector parse it and push_back the result to Server.routes (which is a vector);
-  std::vector<Config> routes_vec = cfg.get_vec("route");
-  for (size_t i = 0; i < routes_vec.size(); i++) {
-    Route cur_route;
-    Config &cur_cfg = routes_vec[i];
-    cur_route.location = cur_cfg["location"].unwrap();
-    cur_route.methods = Config::split_string(cur_cfg.get_value_safely("methods"));
-    cur_route.redirection = cur_cfg.get_value_safely("redirection");
-    cur_route.root_dir = cur_cfg.get_value_safely("root_dir");
-    cur_route.index = cur_cfg.get_value_safely("index");
-    cur_route.error_page = cur_cfg.get_value_safely("error_page");
-    cur_route.dir_listing = cur_cfg.get_value_safely("dir_listing") == "true";
-    cur_route.default_file_for_dir_request_path = cur_cfg.get_value_safely("default_file_for_dir_request_path");
-    cur_route.cgi_extension = cur_cfg.get_value_safely("cgi_extension");
-    cur_route.upload_files_route = cur_cfg.get_value_safely("upload_files_route");
-    serv.routes.push_back(cur_route);
-  }
+    // 6. Setup routes with one or multiple of the following rules/configuration
+    // 1. get_vec routes
+    // 2. for each cfg in vector parse it and push_back the result to
+    // Server.routes (which is a vector);
+    std::vector<Config> routes_vec = cfg.get_vec("route");
+    for (size_t i = 0; i < routes_vec.size(); i++) {
+      Route cur_route;
+      Config &cur_cfg = routes_vec[i];
+      cur_route.location = cur_cfg["location"].unwrap();
+      cur_route.methods =
+          Config::split_string(cur_cfg.get_value_safely("methods"));
+      cur_route.redirection = cur_cfg.get_value_safely("redirection");
+      cur_route.root_dir = cur_cfg.get_value_safely("root_dir");
+      cur_route.index = cur_cfg.get_value_safely("index");
+      cur_route.error_page = cur_cfg.get_value_safely("error_page");
+      cur_route.dir_listing = cur_cfg.get_value_safely("dir_listing") == "true";
+      cur_route.default_file_for_dir_request_path =
+          cur_cfg.get_value_safely("default_file_for_dir_request_path");
+      cur_route.cgi_extension = cur_cfg.get_value_safely("cgi_extension");
+      cur_route.upload_files_route =
+          cur_cfg.get_value_safely("upload_files_route");
+      serv.routes.push_back(cur_route);
+    }
+    return 0;
+  } catch (std::exception &e) {
+    logger->log_error("Can't setup one of the servers: " + static_cast<std::string>(e.what()));
+    return (-1);
+  };
   return 0;
-} catch (std::exception &e) {
-  std::cout << "caught " << e.what() << std::endl;
-};
-return 0;
 }
 
 int ConnectionManager::start_server(Server &serv) {
   serv.timeout = static_cast<double>(ft_atoi((*config)["timeout"].unwrap()));
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (new_listen_fd < 0) {
-    std::string error = "can't create socket " + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
+    std::string error = "can't create socket " + serv.host + ":" +
+                        ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     return (-1);
   }
   struct sockaddr_in server_addr_in;
-  server_addr_in.sin_family = AF_INET;
-  server_addr_in.sin_addr.s_addr = htonl(serv.srv_sockaddr.sin_addr.s_addr); //FIX htonl(serv.host_struct); 
+  server_addr_in.sin_family = serv.srv_sockaddr.sin_family;
+  server_addr_in.sin_addr.s_addr =
+      htonl(serv.srv_sockaddr.sin_addr.s_addr); // FIX htonl(serv.host_struct);
   server_addr_in.sin_port = htons(serv.port);
-  memset(&(server_addr_in.sin_zero), '\0', 8);
+  memset(&(server_addr_in.sin_zero), '\0', 8); // FIX forbidden
   int opt = 1;
-  if (setsockopt(new_listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
-    std::string error = "can't assign address to socket" + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
+  if (setsockopt(new_listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) <
+      0) {
+    std::string error = "can't assign address to socket" + serv.host + ":" +
+                        ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     close(new_listen_fd);
     return (-1);
   }
-  if (bind(new_listen_fd, (struct sockaddr *)&server_addr_in, sizeof(server_addr_in)) < 0) {
-    std::string error = "can't bind socket " + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
+  if (bind(new_listen_fd, (struct sockaddr *)&server_addr_in,
+           sizeof(server_addr_in)) < 0) {
+    std::string error = "can't bind socket " + serv.host + ":" +
+                        ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     close(new_listen_fd);
-      return (-1);
+    return (-1);
   }
   // FIX - load data about listen backlog from the config or from somewhere!
-  if (listen(new_listen_fd, 20) == -1)
-  {
-    std::string error = "can't listen to socket" + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
+  if (listen(new_listen_fd, 20) == -1) {
+    std::string error = "can't listen to socket" + serv.host + ":" +
+                        ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     close(new_listen_fd);
     return (-1);
   }
-  std::string status_message = "Server " + serv.host + ":" + ft_itos(serv.port) + " is listening!";
+  std::string status_message =
+      "Server " + serv.host + ":" + ft_itos(serv.port) + " is listening!";
   logger->log_info(status_message);
   serv.listen_fd = new_listen_fd;
   listen_servers[serv.listen_fd] = serv;
@@ -184,7 +193,6 @@ int ConnectionManager::add_listen_server(Config &cfg) {
   }
   return start_server(serv);
 }
-
 
 int ConnectionManager::setup() {
   std::vector<Config> server_configs;
@@ -206,9 +214,9 @@ int ConnectionManager::run() {
     return -1;
   }
   while (true) {
-    int poll_result = poll(fds.data(), fds.size(), 10); //FIX:timeout from cfg?
+    int poll_result = poll(fds.data(), fds.size(), 10); // FIX:timeout from cfg?
     if (poll_result == -1) {
-      logger->log_error("fatal error in poll()");
+      logger->log_error("fatal error in poll(): " + static_cast<std::string>(strerror(errno)));
       return -1;
     }
     if (poll_result == 0) {
@@ -226,7 +234,7 @@ int ConnectionManager::cleanup(int fd) {
   // HttpConnection &connection = connections[fd];
   // time_t cur_time;
   // cur_time = std::time(&cur_time);
-  // if (connection.is_cgi_running && 
+  // if (connection.is_cgi_running &&
   //     (cur_time - connection.last_cgi_activity) > CGI_TIMEOUT) {
   //   //timeout only CGI
   //   ;
@@ -259,7 +267,7 @@ int ConnectionManager::handle_fds() {
 bool ConnectionManager::handle_poll_problem(int fd) {
 
   (void)fd;
-  //FIX kill serv if err, webserv if fatal, nothing if small err
+  // FIX kill serv if err, webserv if fatal, nothing if small err
   logger->log_error("some poll error");
   fds[fd].revents = 0;
   return false;
@@ -286,7 +294,8 @@ bool ConnectionManager::handle_poll_read(int fd) {
   int bytes_recvd = recv(fd, bufg, 4000, 0);
   // int bytes_recvd = recv(fd, buffer, sizeof(buffer), 0);
   if (bytes_recvd < 0) {
-    logger->log_error("recv failed on socket " + ft_itos(fd) + ", closing the connection.");
+    logger->log_error("recv failed on socket " + ft_itos(fd) +
+                      ", closing the connection.");
     exit(1);
     close_connection(fd);
     return true;
@@ -300,14 +309,16 @@ bool ConnectionManager::handle_poll_read(int fd) {
   if (bytes_recvd < 4000) {
     connections[fd].recv_done = true;
   }
-  logger->log_info("Recieved " + ft_itos(bytes_recvd) + " bytes on socket " + ft_itos(fd));
+  logger->log_info("Recieved " + ft_itos(bytes_recvd) + " bytes on socket " +
+                   ft_itos(fd));
   connection.recv_stream << bufg;
   bzero(bufg, sizeof(bufg));
   // connection.recv_stream << buffer;
   // bzero(buffer, sizeof(buffer));
   std::string response_string = get_responses_string(connection);
   if (response_string.empty() && connection.is_cgi_running == true) {
-    struct pollfd new_pollfd_struct = {connection.cgi_pipe[1],POLLIN | POLLOUT,0};
+    struct pollfd new_pollfd_struct = {connection.cgi_pipe[1], POLLIN | POLLOUT,
+                                       0};
     fds.push_back(new_pollfd_struct);
     pipe_to_socket[connection.cgi_pipe[0]] = fd;
   }
@@ -316,16 +327,17 @@ bool ConnectionManager::handle_poll_read(int fd) {
 }
 
 void ConnectionManager::handle_accept(int fd) {
-	sockaddr_in socket_address;
-	socklen_t socket_address_length = sizeof(socket_address);
+  sockaddr_in socket_address;
+  socklen_t socket_address_length = sizeof(socket_address);
   int new_fd = accept(fd, (sockaddr *)&socket_address, &socket_address_length);
   if (new_fd == -1) {
-    logger->log_error("Failed to accept a new connection on socket" + ft_itos(fd));
+    logger->log_error("Failed to accept a new connection on socket" +
+                      ft_itos(fd));
     return;
   }
 
-  
-  std::cout << "ACCEPTED SOCKET " << fd <<", new one is " << new_fd << std::endl;
+  std::cout << "ACCEPTED SOCKET " << fd << ", new one is " << new_fd
+            << std::endl;
 
   // FIX - crasheson thisparagraph
   struct pollfd new_pollfd_struct;
@@ -341,11 +353,7 @@ void ConnectionManager::handle_accept(int fd) {
   connection.update_last_activity();
   connections[new_fd] = connection;
   fds[fd].revents = 0;
-
 }
-
-
-
 
 bool ConnectionManager::handle_poll_write(int fd) {
   fds[fd].revents = 0;
@@ -359,14 +367,15 @@ bool ConnectionManager::handle_poll_write(int fd) {
       connections[fd].send_buffer = "CGI TIMEOUT";
       return false;
     }
-    return handle_cgi_output(connections[fd]); //NB will read() from pipe
+    return handle_cgi_output(connections[fd]); // NB will read() from pipe
   }
 
   if (connections[fd].send_buffer.empty()) {
     return false;
   }
 
-  int bytes_sent = send(fd, connections[fd].send_buffer.c_str(), connections[fd].send_buffer.length(), 0);
+  int bytes_sent = send(fd, connections[fd].send_buffer.c_str(),
+                        connections[fd].send_buffer.length(), 0);
   if (bytes_sent < 0) {
     logger->log_error("send failed on socket" + ft_itos(fd));
     close_connection(fd);
@@ -385,13 +394,14 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
     int status_code;
     connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
     if (connection.cgi_result == 0) {
-      //NB cgi is still running
+      // NB cgi is still running
       return false;
     }
     if (connection.cgi_result != connection.cgi_pid) {
-      //NB unknown waitpid error - strange pid returned
+      // NB unknown waitpid error - strange pid returned
       kill_cgi(connection.fd);
-      logger->log_error("waitpid returned garbage pid on socket " + ft_itos(connection.fd));
+      logger->log_error("waitpid returned garbage pid on socket " +
+                        ft_itos(connection.fd));
       return false;
     }
     if (!WIFEXITED(status_code)) {
@@ -411,7 +421,8 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   std::cout << "cgi read\n";
   int bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len);
   if (bytes_read < 0) {
-    logger->log_error("read() failed on CGI pipe for socket " + ft_itos(connection.fd));
+    logger->log_error("read() failed on CGI pipe for socket " +
+                      ft_itos(connection.fd));
     connection.send_buffer = "INTERNAL SERVER ERROR";
     kill_cgi(connection.fd);
     return true;
@@ -426,14 +437,6 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   return true;
 }
 
-
-
-
-
-
-
-
-
 /*------------ UTILS ----------------*/
 
 void ConnectionManager::close_connection(int fd) {
@@ -442,84 +445,86 @@ void ConnectionManager::close_connection(int fd) {
   }
 
   // fds.erase(fds.find(fd));std::find_if
-  for (std::vector<struct pollfd>::iterator it = fds.begin(); it != fds.end();) {
+  for (std::vector<struct pollfd>::iterator it = fds.begin();
+       it != fds.end();) {
     if (it->fd == fd) {
       fds.erase(it);
       break;
     }
     it++;
   }
-  
+
   connections.erase(fd);
 }
-
 
 bool ConnectionManager::conn_timed_out(int fd) {
   time_t now;
   now = std::time(&now);
-  double connection_age = std::difftime(connections[fd].last_activity,  now);
+  double connection_age = std::difftime(connections[fd].last_activity, now);
   if (connection_age > CONN_TIMEOUT) { // FIX - get from config
     return true;
-  }  
+  }
   return false;
 }
 
 bool ConnectionManager::cgi_timed_out(int fd) {
   time_t now;
   now = std::time(&now);
-  double cgi_age = std::difftime(connections[fd].last_activity,  now);
+  double cgi_age = std::difftime(connections[fd].last_activity, now);
   if (cgi_age > CONN_TIMEOUT) { // FIX - get from config
     return true;
-  }  
+  }
   return false;
 }
 
-//Do I clear the buffer or not?
-// maybe make kill_cgi() and stop_cgi() different funcs?
+// Do I clear the buffer or not?
+//  maybe make kill_cgi() and stop_cgi() different funcs?
 void ConnectionManager::kill_cgi(int fd) {
   kill(connections[fd].cgi_pid, SIGKILL);
   close(connections[fd].cgi_pipe[0]);
   pipe_to_socket.erase(connections[fd].cgi_pipe[0]);
   connections[fd].is_cgi_running = false;
-  //FIX connections[fd].send_buffer.clear();
+  // FIX connections[fd].send_buffer.clear();
 }
 
+#define DEBUG
+#ifdef DEBUG
+void ConnectionManager::print_connection_manager() {
+  std::cout << "====\n====\n====\n";
+  std::cout << (*config).get_content() << std::endl;
+  std::cout << logger << std::endl;
+  std::cout << "File descriptor list:" << std::endl;
 
-# define DEBUG
-# ifdef DEBUG
-  void ConnectionManager::print_connection_manager() {
-    std::cout << "====\n====\n====\n";
-    std::cout << (*config).get_content() << std::endl;
-    std::cout << logger << std::endl;
-    std::cout << "File descriptor list:" << std::endl;
-
-    for (size_t i = 0; i < fds.size(); i++) {
-      std::cout << fds[i].fd << " ";
-    }
-    std::cout << std::endl;
-
-    std::cout << "Connections list:" << std::endl;
-    for (std::map<int, HttpConnection>::iterator it = connections.begin(); it != connections.end(); it++) {
-      std::cout << "\t" << it->first << ": ";
-      it->second.print_connection();
-      // std::cout << std::endl;
-    }
-    std::cout << std::endl;
-
-    std::cout << "listen_servers list:" << std::endl;
-    for (std::map<int, Server>::iterator it = listen_servers.begin(); it != listen_servers.end(); it++) {
-      std::cout << "\t{" << it->first << ": \n";
-      it->second.print_server();
-    }
-    std::cout << "}" << std::endl;
-
-    std::cout << "pipe_to_socket list:" << std::endl;
-    for (std::map<int, int>::iterator it = pipe_to_socket.begin(); it != pipe_to_socket.end(); it++) {
-      std::cout << "\t" << it->first << ": ";
-      std::cout << it->second;
-      std::cout << std::endl;
-    }
-    std::cout << std::endl;
-    std::cout << "====\n====\n====\n";
+  for (size_t i = 0; i < fds.size(); i++) {
+    std::cout << fds[i].fd << " ";
   }
-# endif
+  std::cout << std::endl;
+
+  std::cout << "Connections list:" << std::endl;
+  for (std::map<int, HttpConnection>::iterator it = connections.begin();
+       it != connections.end(); it++) {
+    std::cout << "\t" << it->first << ": ";
+    it->second.print_connection();
+    // std::cout << std::endl;
+  }
+  std::cout << std::endl;
+
+  std::cout << "listen_servers list:" << std::endl;
+  for (std::map<int, Server>::iterator it = listen_servers.begin();
+       it != listen_servers.end(); it++) {
+    std::cout << "\t{" << it->first << ": \n";
+    it->second.print_server();
+  }
+  std::cout << "}" << std::endl;
+
+  std::cout << "pipe_to_socket list:" << std::endl;
+  for (std::map<int, int>::iterator it = pipe_to_socket.begin();
+       it != pipe_to_socket.end(); it++) {
+    std::cout << "\t" << it->first << ": ";
+    std::cout << it->second;
+    std::cout << std::endl;
+  }
+  std::cout << std::endl;
+  std::cout << "====\n====\n====\n";
+}
+#endif

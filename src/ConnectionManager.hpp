@@ -2,51 +2,62 @@
 #define CONNECTIONMANAGER_HPP
 
 #include "Config.hpp"
-#include "Logger.hpp"
+#include "HttpConnection.hpp"
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
-#include "HttpConnection.hpp"
+#include "Logger.hpp"
 
+#include <cstring>
 #include <iostream>
 #include <map>
-#include <vector>
-#include <unistd.h>
-#include <cstring>
 #include <string>
+#include <unistd.h>
+#include <vector>
 
-#include <fcntl.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <netinet/in.h>
 #include <poll.h>
+#include <sys/socket.h>
 
-
-#define CHUNK_SZ_FIX 1024
-
-class	ConnectionManager {
+class ConnectionManager {
 private:
   ConnectionManager();
   ConnectionManager(ConnectionManager const &other);
   ConnectionManager &operator=(const ConnectionManager &obj);
 
-//  public:
-//   ConnectionManager(const std::string &ip, int port, int listen_backlog);
-
-
 public:
   ConnectionManager(Config *cfg, Logger *log);
   ~ConnectionManager();
 
-
 public:
+  /**
+   * @brief Setup the web server.
+   * 
+   * @return int 
+   */
   int setup();
+
+  /**
+   * @brief Run the server.
+   * 
+   * @note Runs indefinitely.
+   * @return int 
+   */
+  int run();
+
+private:
+  /**
+   * @brief Set the up server from cfg["server"]
+   * 
+   * @param serv 
+   * @param cfg 
+   * @return int 
+   */
   int setup_server(Server &serv, Config &cfg);
   int start_server(Server &serv);
   int add_listen_server(Config &cfg);
   int cleanup(int fd);
-
-  int run();
-
   int handle_fds();
   bool handle_poll_problem(int fd);
   bool handle_poll_read(int fd);
@@ -54,17 +65,12 @@ public:
   void handle_accept(int fd);
 
 private:
-  int process_request(HttpConnection &connection);
-  int answer_request(HttpConnection &connection, HttpRequest &request);
-  int answer_request_with_string(HttpConnection &connection);
-
-private:
-bool handle_cgi_output(HttpConnection &connection);
-void close_connection(int fd);
-bool conn_timed_out(int fd);
-bool cgi_timed_out(int fd);
-void kill_cgi(int fd);
-bool read_cgi_pipe(HttpConnection &connection);
+  bool handle_cgi_output(HttpConnection &connection);
+  void close_connection(int fd);
+  bool conn_timed_out(int fd);
+  bool cgi_timed_out(int fd);
+  void kill_cgi(int fd);
+  bool read_cgi_pipe(HttpConnection &connection);
 
 private:
   int run_cgi(HttpConnection &connection, HttpRequest &request);
@@ -92,13 +98,9 @@ private:
   // CGI data
   std::map<int, int> pipe_to_socket;
 
-  //system buffers
-  char buffer[4096]; // FIX is it the right size?
+  // system buffers
+  char buffer[4096];     // FIX is it the right size?
   char cgi_buffer[1024]; // FIX is it the right size?
-
-
-
-
 
 // private:
 //   void handle_fds();
@@ -112,9 +114,9 @@ private:
 //   void check_timeouts(int fd);
 
 // private:
-//   int accept_(); // accept new connection, returns new_fd. updates (or not?) read_buffers and write_buffers maps.
-//   int recv_chunk_(int fd); // recieves a chunk of data
-//   int send_chunk_(int fd); // send a chunk of data
+//   int accept_(); // accept new connection, returns new_fd. updates (or not?)
+//   read_buffers and write_buffers maps. int recv_chunk_(int fd); // recieves a
+//   chunk of data int send_chunk_(int fd); // send a chunk of data
 
 // /*
 // data structures to update:
@@ -142,11 +144,11 @@ private:
 //   int max_fd_;
 
 // // dynamic data structures, can change with each select() iteration
-# define DEBUG
-# ifdef DEBUG
+#define DEBUG
+#ifdef DEBUG
 public:
   void print_connection_manager();
-# endif
+#endif
 };
 
 #endif // CONNECTIONMANAGER_HPP
