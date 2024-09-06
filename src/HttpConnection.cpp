@@ -111,3 +111,38 @@ HttpConnection	&HttpConnection::operator=(const HttpConnection &other) {
 void HttpConnection::update_last_activity() {
   last_activity = std::time(&last_activity);
 }
+
+
+# define DEBUG
+# ifdef DEBUG
+  void HttpConnection::print_connection() {
+    std::cout << "{";
+	  std::cout << fd << " ";
+	  //std::cout << recv_stream << " ";
+	  std::cout << (*config).unwrap() << " ";
+	  std::cout << recv_buffer << " ";
+	  std::cout << send_buffer << " ";
+	  std::cout << header_str << " ";
+	  std::cout << body_str << " ";
+	  std::cout << last_activity << " ";
+	  std::cout << last_cgi_activity << " ";
+	  std::cout << content_length << " ";
+	  std::cout << busy << " ";
+	  std::cout << is_connected << " ";
+	  std::cout << is_cgi_running << " ";
+	  std::cout << cgi_response << " ";
+	  std::cout << cgi_finished << " ";
+	  std::cout << cgi_result << " ";
+	  std::cout << should_die << " ";
+	  std::cout << is_response_ready << " ";
+	  std::cout << is_keep_alive << " ";
+	  std::cout << header_is_parsed << " ";
+	  std::cout << body_is_read << " ";
+	  std::cout << cgi_pid << " ";
+	  std::cout << cgi_pipe[0] << " ";
+	  std::cout << cgi_pipe[1] << " ";
+	  std::cout << is_chunked_transfer << " ";
+	  std::cout << recv_done << " ";
+    std::cout << "}";
+  }
+# endif

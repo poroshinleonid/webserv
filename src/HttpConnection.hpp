@@ -64,6 +64,14 @@ public:
   int cgi_pipe[2];
   bool is_chunked_transfer;
   bool recv_done;
+
+# define DEBUG
+# ifdef DEBUG
+public:
+  void print_connection();
+# endif
+
 };
+
 
 #endif // HTTPCONNECTION_HPP
