@@ -142,7 +142,11 @@ private:
 //   int max_fd_;
 
 // // dynamic data structures, can change with each select() iteration
-
+# define DEBUG
+# ifdef DEBUG
+public:
+  void print_connection_manager();
+# endif
 };
 
 #endif // CONNECTIONMANAGER_HPP

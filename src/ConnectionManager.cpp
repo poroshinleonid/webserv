@@ -71,7 +71,7 @@ std::string ft_itos(int number) {
 }
 
 int ConnectionManager::setup_server(Server &serv, Config &cfg) {
-
+try {
   // 1. Choose the port and host of each ’server’.
   serv.srv_sockaddr.sin_family = AF_INET;
   serv.srv_sockaddr.sin_port = ft_atoi(cfg["port"].unwrap());
@@ -82,15 +82,17 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 
   // 2. Setup the server_names or not.
   // 3. The first server for a host:port will be the default for this host:port (that means it will answer to all the requests that don’t belong to an other server).
-  std::istringstream iss(cfg["server_name"].unwrap());
-  std::string srv_name;
-  while (iss >> srv_name) {
-    serv.server_names.push_back(srv_name);
-  }
+  // std::istringstream iss(cfg["server_name"].unwrap());
+  // std::string srv_name;
+  // while (iss >> srv_name) {
+  //   serv.server_names.push_back(srv_name);
+  // }
+  serv.server_names = Config::split_string(cfg["server_name"].unwrap());
+
 
   // 4. Setup default error pages.
   std::vector<Config> error_pages = cfg.get_vec("default_page");
-  for (int i = 0; i < error_pages.size(); i++) {
+  for (size_t i = 0; i < error_pages.size(); i++) {
     ErrorPage page;
     page.page_code = ft_atoi(error_pages[i]["code"].unwrap());
     page.html_file = error_pages[i]["html_file"].unwrap();
@@ -105,19 +107,35 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
   } else {
     serv.client_body_size = Config::client_default_max_body_size;
   }
-  serv.timeout = ft_atoi(cfg["timeout"].unwrap());
+  // serv.timeout = ft_atoi(cfg["timeout"].unwrap());
   // 6. Setup routes with one or multiple of the following rules/configuration
-  1. get_vec routes
-  2. for each cfg in vector parse it and push_back the result to Server.routes (which is a vector);
-
-  // FIX somehow parse all of the routes
-  // for (int i = 0; i < cfg["routes"].length(); i++) {
-  //   routes.append()
-  // }
+  // 1. get_vec routes
+  // 2. for each cfg in vector parse it and push_back the result to Server.routes (which is a vector);
+  std::vector<Config> routes_vec = cfg.get_vec("route");
+  for (size_t i = 0; i < routes_vec.size(); i++) {
+    Route cur_route;
+    Config &cur_cfg = routes_vec[i];
+    cur_route.location = cur_cfg["location"].unwrap();
+    cur_route.methods = Config::split_string(cur_cfg.get_value_safely("methods"));
+    cur_route.redirection = cur_cfg.get_value_safely("redirection");
+    cur_route.root_dir = cur_cfg.get_value_safely("root_dir");
+    cur_route.index = cur_cfg.get_value_safely("index");
+    cur_route.error_page = cur_cfg.get_value_safely("error_page");
+    cur_route.dir_listing = cur_cfg.get_value_safely("dir_listing") == "true";
+    cur_route.default_file_for_dir_request_path = cur_cfg.get_value_safely("default_file_for_dir_request_path");
+    cur_route.cgi_extension = cur_cfg.get_value_safely("cgi_extension");
+    cur_route.upload_files_route = cur_cfg.get_value_safely("upload_files_route");
+    serv.routes.push_back(cur_route);
+  }
   return 0;
+} catch (std::exception &e) {
+  std::cout << "caught " << e.what() << std::endl;
+};
+return 0;
 }
 
 int ConnectionManager::start_server(Server &serv) {
+  serv.timeout = static_cast<double>(ft_atoi((*config)["timeout"].unwrap()));
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (new_listen_fd < 0) {
     std::string error = "can't create socket " + serv.host + ":" + ft_itos(serv.port) + " : " + strerror(errno);
@@ -464,3 +482,43 @@ void ConnectionManager::kill_cgi(int fd) {
   connections[fd].is_cgi_running = false;
   //FIX connections[fd].send_buffer.clear();
 }
+
+
+# define DEBUG
+# ifdef DEBUG
+  void ConnectionManager::print_connection_manager() {
+    std::cout << "====\n====\n====\n";
+    std::cout << (*config).get_content() << std::endl;
+    std::cout << logger << std::endl;
+    std::cout << "File descriptor list:" << std::endl;
+
+    for (size_t i = 0; i < fds.size(); i++) {
+      std::cout << fds[i].fd << " ";
+    }
+    std::cout << std::endl;
+
+    std::cout << "Connections list:" << std::endl;
+    for (std::map<int, HttpConnection>::iterator it = connections.begin(); it != connections.end(); it++) {
+      std::cout << "\t" << it->first << ": ";
+      it->second.print_connection();
+      // std::cout << std::endl;
+    }
+    std::cout << std::endl;
+
+    std::cout << "listen_servers list:" << std::endl;
+    for (std::map<int, Server>::iterator it = listen_servers.begin(); it != listen_servers.end(); it++) {
+      std::cout << "\t{" << it->first << ": \n";
+      it->second.print_server();
+    }
+    std::cout << "}" << std::endl;
+
+    std::cout << "pipe_to_socket list:" << std::endl;
+    for (std::map<int, int>::iterator it = pipe_to_socket.begin(); it != pipe_to_socket.end(); it++) {
+      std::cout << "\t" << it->first << ": ";
+      std::cout << it->second;
+      std::cout << std::endl;
+    }
+    std::cout << std::endl;
+    std::cout << "====\n====\n====\n";
+  }
+# endif
