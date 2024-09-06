@@ -1,5 +1,5 @@
 Write route parser
-
+dffdffdf
 
 
 1. Choose the port and host of each ’server’.
@@ -94,26 +94,6 @@ add timestamps to logger
 what if the request if for cgi
 u need to check keep-alive so I can know if I need to close the socket or not
 we are reading from the cgi in a blocking way in this architecture
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
