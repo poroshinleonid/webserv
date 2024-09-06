@@ -192,9 +192,8 @@ int ConnectionManager::setup() {
   for (size_t i = 0; i < server_configs.size(); i++) {
     add_listen_server(server_configs[i]);
   }
-  //FIX log and exit
   if (listen_servers.empty()) {
-    std::cout << "no servers loaded successfully, nothing to do, bye" << std::endl;
+    (*logger).log_error("No servers were successfully set up!");
     return -1;
   }
   listen_servers[fds[0].fd].is_default = true;
@@ -202,6 +201,10 @@ int ConnectionManager::setup() {
 }
 
 int ConnectionManager::run() {
+  if (listen_servers.empty()) {
+    (*logger).log_error("No servers to run! Exitting.");
+    return -1;
+  }
   while (true) {
     int poll_result = poll(fds.data(), fds.size(), 10); //FIX:timeout from cfg?
     if (poll_result == -1) {
@@ -219,20 +222,18 @@ int ConnectionManager::run() {
 // FIX
 int ConnectionManager::cleanup(int fd) {
   (void)fd;
-  //FIX forbidden function
+  // // FIX forbidden function
   // HttpConnection &connection = connections[fd];
   // time_t cur_time;
   // cur_time = std::time(&cur_time);
-  // for (size_t i = 0; i < connection.length(); i++) {
-  //   if (connection.is_cgi_running && 
-  //      (cur_time - connection.last_cgi_activity) > CGI_TIMEOUT) {
-  //     //timeout only CGI
-  //     ;
-  //   }
-  //   if ((cur_time - connection.last_activity) > CONN_TIMEOUT)
-  //     //timeout the connection
-  //     ;
+  // if (connection.is_cgi_running && 
+  //     (cur_time - connection.last_cgi_activity) > CGI_TIMEOUT) {
+  //   //timeout only CGI
+  //   ;
   // }
+  // if ((cur_time - connection.last_activity) > CONN_TIMEOUT)
+  //   //timeout the connection
+  //   ;
   // //check other errors
   return 0;
 }

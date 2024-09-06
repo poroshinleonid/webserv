@@ -1,3 +1,33 @@
+0. make format(create the rule and run it), re-read all of the code, cleanup the directories form any files that I don't need'
+
+1. Make a list of timeouts that I need to keep track of
+2. Decide where to store each timeout and respective timer
+3. Create variables for timers and timeout values, add them to all of the constructors
+4. Add setting timeout values from config to ConnectionManager Setup
+5. Add timer tracking everywhere
+6. Add cleanup everywhere where it is necessary
+
+
+7. Add descriptions (detailed) to every function that I have written
+
+8. Fix all of the FI_X  comments everywhere.
+
+9. Create a list of my modules that I am going to write tests for
+10. Write and run tests, fix bugs if they arise.
+
+
+
+
+
+
+
+
+
+
+
+----------------------------------------------------------------------------------------------------------------------------------
+
+
 Write route parser
 dffdffdf
 
