@@ -1,20 +1,19 @@
 #ifndef LOGGER_HPP
 #define LOGGER_HPP
 
+#include <fstream>
 #include <string>
 #include <vector>
-#include <fstream>
 
-class	Logger {
+class Logger {
 private:
   Logger &operator=(const Logger &obj);
   Logger(Logger const &other);
 
 public:
   Logger();
-  Logger (const std::string &log_file);
+  Logger(const std::string &log_file);
   ~Logger();
-
 
 public:
   void log(const std::string &log_lvl, const std::string &message) const;
