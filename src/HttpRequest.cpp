@@ -15,7 +15,7 @@ HttpRequest	&HttpRequest::operator=(const HttpRequest &other) {
 }
 
 HttpRequest::HttpRequest(const std::string &request_string) {
-  // FIX probly parse the string here
+  //  probly parse the string here
   // and set a var isValid trve or false
 }
 

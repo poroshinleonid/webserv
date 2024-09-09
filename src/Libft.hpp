@@ -26,7 +26,7 @@ private:
    * @param s 
    * @return int 
    */
-  static int ft_atoip(const std::string &s);
+  static unsigned long ft_atoip(const std::string &s);
 
   /**
    * @brief number to its string repr
@@ -35,6 +35,15 @@ private:
    * @return std::string 
    */
   static std::string ft_itos(int number);
+
+  /**
+   * @brief ip from binary to string repr
+   * 
+   * @param s 
+   * @return int 
+   */
+  static std::string ft_iptoa(int ip_repr);
+
 };
 
 #endif // LIBFT_HPP

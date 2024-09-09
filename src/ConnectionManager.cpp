@@ -52,7 +52,7 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
     serv.srv_sockaddr.sin_port = Libft::ft_atoi(cfg["port"].unwrap());
     serv.srv_sockaddr.sin_addr.s_addr =
         Config::string_to_ip(cfg["host"].unwrap());
-    bzero(serv.srv_sockaddr.sin_zero, 8); // FIX: forbidden fun
+    bzero(serv.srv_sockaddr.sin_zero, 8); // LIBFT: forbidden fun
     serv.host = serv.srv_sockaddr.sin_addr.s_addr;
     serv.port = serv.srv_sockaddr.sin_port;
 
@@ -128,9 +128,9 @@ int ConnectionManager::start_server(Server &serv) {
   struct sockaddr_in server_addr_in;
   server_addr_in.sin_family = serv.srv_sockaddr.sin_family;
   server_addr_in.sin_addr.s_addr =
-      htonl(serv.srv_sockaddr.sin_addr.s_addr); // FIX htonl(serv.host_struct);
+      htonl(serv.srv_sockaddr.sin_addr.s_addr);
   server_addr_in.sin_port = htons(serv.port);
-  memset(&(server_addr_in.sin_zero), '\0', 8); // FIX forbidden
+  memset(&(server_addr_in.sin_zero), '\0', 8); // LIBFT bzero
   int opt = 1;
   if (setsockopt(new_listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) <
       0) {
@@ -148,7 +148,7 @@ int ConnectionManager::start_server(Server &serv) {
     close(new_listen_fd);
     return (-1);
   }
-  // FIX - load data about listen backlog from the config or from somewhere!
+  // REVISE - load data about listen backlog from the config or from somewhere!
   if (listen(new_listen_fd, 20) == -1) {
     std::string error = "can't listen to socket" + serv.host + ":" +
                         Libft::ft_itos(serv.port) + " : " + strerror(errno);
@@ -194,7 +194,7 @@ int ConnectionManager::run() {
     return 1;
   }
   while (true) {
-    int poll_result = poll(fds.data(), fds.size(), 10); // FIX:timeout from cfg?
+    int poll_result = poll(fds.data(), fds.size(), 10); // REVISE:timeout from cfg?
     if (poll_result == -1) {
       logger->log_error("fatal error in poll(): " + static_cast<std::string>(strerror(errno)));
       return -1;
@@ -202,43 +202,35 @@ int ConnectionManager::run() {
     if (poll_result == 0) {
       continue;
     }
-    if (handle_fds()) {
-      //FIX - add complete cleanup and shut down the server correctly.
+    if (handle_fds()) { // -1 on fatal error, 0 on success
+
+      //add complete cleanup and shut down the Server(or webserv?) correctly.
       return -1;
     }
   }
   return 0;
 }
 
-// FIX
 int ConnectionManager::cleanup(int fd) {
-  (void)fd;
-  // FIX forbidden function
-  HttpConnection &connection = connections[fd];
-  time_t cur_time;
-  cur_time = std::time(&cur_time);
-  if (connection.is_cgi_running && 
-      std::difftime(connection.last_cgi_activity, cur_time) > connection.serv->cgi_timeout) {
-    kill_cgi(fd);
-    connection.send_buffer = "CGI timeout";
+  if (connections[fd].is_cgi_running && cgi_timed_out(fd)) {
+    timeout_cgi(fd);
     return 0;
   }
-  if (std::difftime(connection.last_activity, cur_time) > connection.serv->timeout) {
-    close_connection(fd);
+  if (conn_timed_out(fd)) {
+      close_connection(fd);
     return 1;
   }
   return 0;
 }
 
-// fix handle_* functions return values
+// Ensure handle_* functions return values are correct
 int ConnectionManager::handle_fds() {
   bool io_happened = false;
-  bool poll_vector_changed = false;
   bool fatal = false;
-  for (int i = 0, sz = fds.size(); i < sz; i++) {
+  for (size_t i = 0; i < fds.size(); i++) {
     int fd = fds[i].fd;
     if (io_happened) {
-      poll_vector_changed = cleanup(fd);
+      cleanup(fd);
     } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
       fatal = handle_poll_problem(fd);
     } else if (fds[i].revents & POLLIN) {
@@ -246,27 +238,32 @@ int ConnectionManager::handle_fds() {
     } else if (fds[i].revents & POLLOUT) {
       io_happened = handle_poll_write(fd);
     }
-    if (poll_vector_changed) {
-      sz--;
-    }
     if (fatal) {
       return -1;
     }
+    fds[fd].revents = 0;
   }
   return 0;
 }
 
 bool ConnectionManager::handle_poll_problem(int fd) {
   (void)fd;
-  // FIX kill Server instance if err, return true if fatal, nothing if small err (just fix it or idk)
   logger->log_error("some poll error");
   fds[fd].revents = 0;
   return false;
 }
 
-// FIX add cgi handling when dying
-// FIX also remove fd when dying
+// when recv error don't need to kill cgi
+// because re don't recv if it is running
+// can I recv() while CGI is running? I think NO.
 bool ConnectionManager::handle_poll_read(int fd) {
+  HttpConnection &connection = connections[fd];
+  if (connection.is_cgi_running) {
+    if (cgi_timed_out(fd)) {
+      timeout_cgi(fd);
+    }
+    return false;
+  }
   fds[fd].revents = 0;
   if (connections[fd].recv_done == true) {
     return false;
@@ -275,16 +272,15 @@ bool ConnectionManager::handle_poll_read(int fd) {
     handle_accept(fd);
     return true;
   }
+  // there's data to read from CGI
   if (pipe_to_socket.find(fd) != pipe_to_socket.end()) {
     return handle_cgi_output(connections[pipe_to_socket[fd]]);
   }
-  HttpConnection &connection = connections[fd];
   connection.busy = true;
-  std::cout << "recv socket " << fd << std::endl;
+  (*logger).log_info("recv on socket" + Libft::ft_itos(fd));
   char bufg[4001];
   int bytes_recvd = recv(fd, bufg, 4000, 0);
   connection.update_last_activity();
-  // int bytes_recvd = recv(fd, buffer, sizeof(buffer), 0);
   if (bytes_recvd < 0) {
     logger->log_error("recv failed on socket " + Libft::ft_itos(fd) +
                       ", closing the connection.");
@@ -293,8 +289,8 @@ bool ConnectionManager::handle_poll_read(int fd) {
     return true;
   }
   if (bytes_recvd == 0) {
-    logger->log_info("socket " + Libft::ft_itos(fd) + "hung up.");
     // close if not keep-alive!
+    logger->log_info("socket " + Libft::ft_itos(fd) + "hung up.");
     close_connection(fd);
     return true;
   }
@@ -333,7 +329,7 @@ void ConnectionManager::handle_accept(int fd) {
   std::cout << "ACCEPTED SOCKET " << fd << ", new one is " << new_fd
             << std::endl;
 
-  // FIX - crasheson thisparagraph
+  // REVISE - crasheson thisparagraph
   struct pollfd new_pollfd_struct;
   new_pollfd_struct.fd = new_fd;
   new_pollfd_struct.events = POLLIN | POLLOUT;
@@ -357,10 +353,9 @@ bool ConnectionManager::handle_poll_write(int fd) {
   }
   if (connections[fd].is_cgi_running) {
     if (cgi_timed_out(fd)) {
-      kill_cgi(fd);
-      connections[fd].send_buffer = "CGI TIMEOUT";
-      return false;
+      timeout_cgi(fd);
     }
+    return false;
     // return handle_cgi_output(connections[fd]);
     // can not do it because we didn't check if poll() said we even can read() form the pipe!
   }
@@ -411,7 +406,8 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
 //assumes poll() said we can read from the pipe!
 bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   int buf_len = sizeof(cgi_buffer);
-  (*logger).log_info("reading CGI");
+  (*logger).log_info("reading CGI" + Libft::ft_itos(connection.cgi_pipe[0]) + "on socket" + \
+                     Libft::ft_itos(connection.fd));
   bzero(cgi_buffer, buf_len);
   int bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len);
   connection.update_last_cgi_activity();
@@ -419,16 +415,19 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
     logger->log_error("read() failed on CGI pipe for socket " +
                       Libft::ft_itos(connection.fd));
     connection.send_buffer = "INTERNAL SERVER ERROR";
+    connection.is_response_ready = true;
+    connection.busy = false;
     kill_cgi(connection.fd);
     return true;
   }
   connection.send_buffer.append(cgi_buffer);
   bzero(cgi_buffer, buf_len);
-  if (bytes_read == buf_len) {
-    return true;
+  if (bytes_read < buf_len) {
+    kill_cgi(connection.fd);
+    connection.cgi_finished = true;
+    connection.is_response_ready = true;
+    connection.busy = false;
   }
-  kill_cgi(connection.fd);
-  connection.cgi_finished = true;
   return true;
 }
 
@@ -457,8 +456,8 @@ void ConnectionManager::close_connection(int fd) {
 bool ConnectionManager::conn_timed_out(int fd) {
   time_t now;
   now = std::time(&now);
-  double connection_age = std::difftime(connections[fd].last_activity, now);
-  if (connection_age > connections[fd].serv->timeout) { // FIX - get from config
+  double connection_age = std::difftime(now, connections[fd].last_activity);
+  if (connection_age > connections[fd].serv->timeout) {
     return true;
   }
   return false;
@@ -467,22 +466,28 @@ bool ConnectionManager::conn_timed_out(int fd) {
 bool ConnectionManager::cgi_timed_out(int fd) {
   time_t now;
   now = std::time(&now);
-  double cgi_age = std::difftime(connections[fd].last_activity, now);
-  if (cgi_age > connections[fd].serv->timeout) { // FIX - get from config
+  double cgi_age = std::difftime(now, connections[fd].last_activity);
+  if (cgi_age > connections[fd].serv->timeout) {
     return true;
   }
   return false;
 }
 
-// Do I clear the buffer or not?
-//  maybe make kill_cgi() and stop_cgi() different funcs?
 void ConnectionManager::kill_cgi(int connection_fd) {
   kill(connections[connection_fd].cgi_pid, SIGKILL);
   close(connections[connection_fd].cgi_pipe[0]);
   pipe_to_socket.erase(connections[connection_fd].cgi_pipe[0]);
   connections[connection_fd].is_cgi_running = false;
-  // FIX connections[connection_fd].send_buffer.clear();
 }
+
+void ConnectionManager::timeout_cgi(int connection_fd) {
+  kill_cgi(connection_fd);
+  connections[connection_fd].send_buffer = "CGI TIMEOUT";
+  connections[connection_fd].is_cgi_running = false;
+  connections[connection_fd].is_response_ready = true;
+}
+
+
 
 #define DEBUG
 #ifdef DEBUG

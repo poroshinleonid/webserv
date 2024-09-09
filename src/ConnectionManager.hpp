@@ -94,8 +94,11 @@ private:
   /**
    * @brief Go through pollfd vector after poll() returned positive value
    * 
+   * 
    * The main program loop calls it.
    * @return int 
+   * @retval 0 on success
+   * @retval -1 on fatal error
    */
   int handle_fds();
 
@@ -154,7 +157,7 @@ private:
   void close_connection(int fd);
 
   /**
-   * @brief checks if the connection has timed out
+   * @brief checks if the connections[fd]'s CGI has timed out
    * 
    * @param fd 
    * @return true 
@@ -177,14 +180,30 @@ private:
    * @param fd 
    */
   void kill_cgi(int connection_fd);
+
+  /**
+   * @brief read a chunk of data from CGI
+   * 
+   * if all read, set is_response_ready to true and kill the cgi
+   * @param connection
+   * @return true 
+   * @return false 
+   */
   bool read_cgi_pipe(HttpConnection &connection);
 
-private:
+  /**
+   * @brief kill CGI and prepare to send "CGI timeout" response to the client.
+   * 
+   * @param connection_fd
+   */
+  void timeout_cgi(int connection_fd);
+
+private: // deprecated
   int run_cgi(HttpConnection &connection, HttpRequest &request);
   int exec_cgi(HttpConnection &connection, HttpRequest &request);
   std::string try_read_fork(HttpConnection &connection, HttpRequest &request);
 
-// private:
+// private: // moved to HttpConnection
 //   void update_last_activity(HttpConnection &connection);
 //   void update_last_cgi_activity(HttpConnection &connection);
 
@@ -207,8 +226,8 @@ private:
   std::map<int, int> pipe_to_socket;
 
   // system buffers
-  char buffer[4096];     // FIX is it the right size?
-  char cgi_buffer[1024]; // FIX is it the right size
+  char buffer[4096];     // REVISE is it the right size?
+  char cgi_buffer[1024]; // REVISE is it the right size
 
 #define DEBUG
 #ifdef DEBUG

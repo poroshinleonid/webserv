@@ -16,7 +16,8 @@ SOURCE_FILES := \
 								ConnectionManager.cpp \
 								HttpConnection.cpp \
 								Logger.cpp \
-								Server.cpp
+								Server.cpp \
+								Libft.cpp
 
 
 SOURCES := $(addprefix $(SRCDIR)/,$(SOURCE_FILES))

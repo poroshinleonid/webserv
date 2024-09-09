@@ -35,7 +35,6 @@ HttpConnection::HttpConnection(Config *cfg, Server *srv)
   is_chunked_transfer = false;
 }
 
-// FIX remove?
 //  HttpConnection::HttpConnection(int fd, Server *serv, Config *cfg)  :
 //      fd(fd), config(cfg), serv(serv),
 //      recv_buffer(""), send_buffer(""),

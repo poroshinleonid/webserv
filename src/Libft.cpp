@@ -1,8 +1,12 @@
 #include "Libft.hpp"
+#include "Config.hpp"
 
 #include <sstream>
+#include <string>
 
 #include <arpa/inet.h>
+#include <netinet/in.h>
+
 
 Libft::Libft() {}
 
@@ -23,10 +27,29 @@ int Libft::ft_atoi(const std::string &s) {
   return std::atoi(s.c_str());
 }
 
-int Libft::ft_atoip(const std::string &s) {
-  int result;
-  inet_pton(AF_INET, s.c_str(), &result); // FIX forbidden function
-  return result;
+unsigned long Libft::ft_atoip(const std::string &s) {
+  unsigned long result;
+  // string_to_ip
+  inet_pton(AF_INET, s.c_str(), &result); // LIBFT forbidden function
+  return static_cast<unsigned long>(Config::string_to_ip(s));
+}
+
+std::string Libft::ft_iptoa(int ip_repr) {
+  int a, b, c, d;
+  std::ostringstream strm;
+  a = (ip_repr >> 24);
+  b = (ip_repr >> 16) & 0xFF;
+  c = (ip_repr >> 8) & 0xFF;
+  d = ip_repr & 0xFF;
+
+  strm << a;
+  strm << ".";
+  strm << b;
+  strm << ".";
+  strm << c;
+  strm << ".";
+  strm << d;
+  return strm.str();
 }
 
 std::string Libft::ft_itos(int number) {
