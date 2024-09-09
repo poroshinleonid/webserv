@@ -10,7 +10,7 @@ Server::Server(Server const &other)
     : srv_sockaddr(other.srv_sockaddr), server_names(other.server_names),
       error_pages(other.error_pages),
       client_max_body_size(other.client_max_body_size), routes(other.routes),
-      port(other.port), host(other.host), timeout(other.timeout),
+      port(other.port), host(other.host), timeout(other.timeout), cgi_timeout(other.cgi_timeout),
       listen_fd(other.listen_fd), is_default(other.is_default),
       server_name(other.server_name),
       default_error_pages(other.default_error_pages),
@@ -28,6 +28,7 @@ Server &Server::operator=(const Server &other) {
   port = other.port;
   host = other.host;
   timeout = other.timeout;
+  cgi_timeout = other.cgi_timeout;
   listen_fd = other.listen_fd;
   is_default = other.is_default;
   server_name = other.server_name;

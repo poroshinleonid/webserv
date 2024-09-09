@@ -36,6 +36,7 @@ public:
 
 public:
   void update_last_activity();
+  void update_last_cgi_activity();
 
 public:
   int fd;

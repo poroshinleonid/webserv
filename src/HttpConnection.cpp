@@ -111,6 +111,10 @@ void HttpConnection::update_last_activity() {
   last_activity = std::time(&last_activity);
 }
 
+void HttpConnection::update_last_cgi_activity() {
+  last_cgi_activity = std::time(&last_cgi_activity);
+}
+
 #define DEBUG
 #ifdef DEBUG
 void HttpConnection::print_connection() {

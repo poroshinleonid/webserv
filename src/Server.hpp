@@ -68,6 +68,7 @@ public: // assign later
   unsigned int port;
   std::string host;
   double timeout;
+  double cgi_timeout;
   int listen_fd;
   bool is_default;
   std::string server_name;

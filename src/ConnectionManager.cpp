@@ -137,7 +137,8 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 }
 
 int ConnectionManager::start_server(Server &serv) {
-  serv.timeout = static_cast<double>(ft_atoi((*config)["timeout"].unwrap()));
+  serv.timeout = static_cast<double>(ft_atoi((*config)["timeout"].unwrap())) / 1000.0;
+  serv.cgi_timeout = static_cast<double>(ft_atoi((*config)["cgi_timeout"].unwrap())) / 1000.0;
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (new_listen_fd < 0) {
     std::string error = "can't create socket " + serv.host + ":" +
@@ -230,29 +231,31 @@ int ConnectionManager::run() {
 // FIX
 int ConnectionManager::cleanup(int fd) {
   (void)fd;
-  // // FIX forbidden function
-  // HttpConnection &connection = connections[fd];
-  // time_t cur_time;
-  // cur_time = std::time(&cur_time);
-  // if (connection.is_cgi_running &&
-  //     (cur_time - connection.last_cgi_activity) > CGI_TIMEOUT) {
-  //   //timeout only CGI
-  //   ;
-  // }
-  // if ((cur_time - connection.last_activity) > CONN_TIMEOUT)
-  //   //timeout the connection
-  //   ;
-  // //check other errors
+  // FIX forbidden function
+  HttpConnection &connection = connections[fd];
+  time_t cur_time;
+  cur_time = std::time(&cur_time);
+  if (connection.is_cgi_running && 
+      std::difftime(connection.last_cgi_activity, cur_time) > connection.serv->cgi_timeout) {
+    kill_cgi(fd);
+    connection.send_buffer = "CGI timeout";
+    return 0;
+  }
+  if (std::difftime(connection.last_activity, cur_time) > connection.serv->timeout) {
+    close_connection(fd);
+    return 1;
+  }
   return 0;
 }
 
 // fix handle_ functions return values
 int ConnectionManager::handle_fds() {
   bool io_happened = false;
-  for (int i = 0, sz = fds.size(); i < sz; i++) {
+  bool poll_vector_changed = false;
+  for (int i = 0, sz = fds.size(); i < sz && !poll_vector_changed; i++) {
     int fd = fds[i].fd;
     if (io_happened) {
-      cleanup(fd);
+      poll_vector_changed = cleanup(fd);
     } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
       io_happened = handle_poll_problem(fd);
     } else if (fds[i].revents & POLLIN) {
@@ -285,13 +288,14 @@ bool ConnectionManager::handle_poll_read(int fd) {
     return true;
   }
   if (pipe_to_socket.find(fd) != pipe_to_socket.end()) {
-    return handle_cgi_output(connections[fd]);
+    return handle_cgi_output(connections[pipe_to_socket[fd]]);
   }
   HttpConnection &connection = connections[fd];
   connection.busy = true;
   std::cout << "recv socket " << fd << std::endl;
   char bufg[4001];
   int bytes_recvd = recv(fd, bufg, 4000, 0);
+  connection.update_last_activity();
   // int bytes_recvd = recv(fd, buffer, sizeof(buffer), 0);
   if (bytes_recvd < 0) {
     logger->log_error("recv failed on socket " + ft_itos(fd) +
@@ -330,6 +334,8 @@ void ConnectionManager::handle_accept(int fd) {
   sockaddr_in socket_address;
   socklen_t socket_address_length = sizeof(socket_address);
   int new_fd = accept(fd, (sockaddr *)&socket_address, &socket_address_length);
+  int one = 1;
+  setsockopt(new_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
   if (new_fd == -1) {
     logger->log_error("Failed to accept a new connection on socket" +
                       ft_itos(fd));
@@ -350,8 +356,8 @@ void ConnectionManager::handle_accept(int fd) {
   // std::cout << "EEEEEE";
   HttpConnection connection(config, &listen_servers[fd]);
   connection.fd = new_fd;
-  connection.update_last_activity();
   connections[new_fd] = connection;
+  connection.update_last_activity();
   fds[fd].revents = 0;
 }
 
@@ -367,7 +373,8 @@ bool ConnectionManager::handle_poll_write(int fd) {
       connections[fd].send_buffer = "CGI TIMEOUT";
       return false;
     }
-    return handle_cgi_output(connections[fd]); // NB will read() from pipe
+    // return handle_cgi_output(connections[fd]);
+    // can not do it because we didn't check if poll() said we even can read() form the pipe!
   }
 
   if (connections[fd].send_buffer.empty()) {
@@ -376,6 +383,7 @@ bool ConnectionManager::handle_poll_write(int fd) {
 
   int bytes_sent = send(fd, connections[fd].send_buffer.c_str(),
                         connections[fd].send_buffer.length(), 0);
+  connections[fd].update_last_activity();
   if (bytes_sent < 0) {
     logger->log_error("send failed on socket" + ft_itos(fd));
     close_connection(fd);
@@ -385,7 +393,6 @@ bool ConnectionManager::handle_poll_write(int fd) {
   if (connections[fd].send_buffer.empty()) {
     connections[fd].recv_done = false;
   }
-  connections[fd].update_last_activity();
   return true;
 }
 
@@ -394,8 +401,7 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
     int status_code;
     connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
     if (connection.cgi_result == 0) {
-      // NB cgi is still running
-      return false;
+      return false; // NB cgi is still running
     }
     if (connection.cgi_result != connection.cgi_pid) {
       // NB unknown waitpid error - strange pid returned
@@ -414,12 +420,13 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
   return read_cgi_pipe(connection);
 }
 
+//assumes poll() said we can read from the pipe!
 bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
-  connection.update_last_activity();
-
   int buf_len = sizeof(cgi_buffer);
-  std::cout << "cgi read\n";
+  (*logger).log_info("reading CGI");
+  bzero(cgi_buffer, buf_len);
   int bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len);
+  connection.update_last_cgi_activity();
   if (bytes_read < 0) {
     logger->log_error("read() failed on CGI pipe for socket " +
                       ft_itos(connection.fd));
@@ -439,21 +446,23 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
 
 /*------------ UTILS ----------------*/
 
+/**
+ * @brief takes connection and correctly closes it, closes the sockets and pipes etc
+ * 
+ * @param fd 
+ */
 void ConnectionManager::close_connection(int fd) {
+  close(fd);
   if (connections[fd].is_cgi_running) {
     kill_cgi(fd);
   }
-
-  // fds.erase(fds.find(fd));std::find_if
   for (std::vector<struct pollfd>::iterator it = fds.begin();
-       it != fds.end();) {
+       it != fds.end();it++) {
     if (it->fd == fd) {
       fds.erase(it);
       break;
     }
-    it++;
   }
-
   connections.erase(fd);
 }
 
@@ -479,12 +488,12 @@ bool ConnectionManager::cgi_timed_out(int fd) {
 
 // Do I clear the buffer or not?
 //  maybe make kill_cgi() and stop_cgi() different funcs?
-void ConnectionManager::kill_cgi(int fd) {
-  kill(connections[fd].cgi_pid, SIGKILL);
-  close(connections[fd].cgi_pipe[0]);
+void ConnectionManager::kill_cgi(int connection_fd) {
+  kill(connections[connection_fd].cgi_pid, SIGKILL);
+  close(connections[connection_fd].cgi_pipe[0]);
   pipe_to_socket.erase(connections[fd].cgi_pipe[0]);
-  connections[fd].is_cgi_running = false;
-  // FIX connections[fd].send_buffer.clear();
+  connections[connection_fd].is_cgi_running = false;
+  // FIX connections[connection_fd].send_buffer.clear();
 }
 
 #define DEBUG

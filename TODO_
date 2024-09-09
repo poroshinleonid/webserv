@@ -1,16 +1,3 @@
-0. make format(create the rule and run it), re-read all of the code, cleanup the directories from any files that I don't need'
-if start_server() is called for 2nd time and returns -1, is the first server cleaned up?
-or does this event not even cause the program to terminate?
-
-
-1. Make a list of timeouts that I need to keep track of
-2. Decide where to store each timeout and respective timer
-3. Create variables for timers and timeout values, add them to all of the constructors
-4. Add setting timeout values from config to ConnectionManager Setup
-5. Add timer tracking everywhere
-6. Add cleanup everywhere where it is necessary
-
-
 7. Add descriptions (detailed) to every function that I have written
 
 8. Fix all of the FI_X  comments everywhere.
@@ -31,6 +18,15 @@ write:
 
 
 ----------------------------------------------------------------------------------------------------------------------------------
+
+  4. Gzip Compression Timeout / write timeout
+    - defined in each HttpConnection
+    - stored in Config (and has a defalut)
+    - starts before writing to the disk
+    - checked before each write()
+    - if (timed out) then stop writing, remove the file and send error back to the client
+
+
 
 
 Write route parser
@@ -289,4 +285,47 @@ response messages. Hence, it relies on the order of response
 arrival to correspond exactly to the order in which requests
 are made on the same connection. 
 
-remove bzero - it's not allowed
+remove bzero - it's not allowed'
+
+
+[x] 0. make format(create the rule and run it), re-read all of the code, cleanup the directories from any files that I don't need'
+[x] if start_server() is called for 2nd time and returns -1, is the first server cleaned up?
+[x] or does this event not even cause the program to terminate?
+
+[x] 2. Decide where to store each timeout and respective timer
+[x] 3. Create variables for timers and timeout values, add them to all of the constructors
+[x] 4. Add setting timeout values from config to ConnectionManager Setup
+[x] 5. Add timer tracking everywhere
+[x] 6. Add cleanup everywhere where it is necessary
+
+
+1. Make a list of timeouts that I need to keep track of
+
+  ! time_t difftime returns seconds in double format
+  ! timouts are stored in Config in mililseconds so we need to convert
+
+  1. Client Request Timeout
+    Limits how long the server waits for the client to send the complete HTTP request.
+    Also the same time is allocated for webserv to send the response back to the client
+    During the request phase when the client is sending data (headers and body) to the server.
+    - defined for each Server instance
+      - kept track of in each HttpConnections
+    - stored in config
+    - timer starts before with the first recv() and not updated with the following recv()s.
+    - timer starts again before the first send() and not updated with the following send()s.
+    - if ((!reading_req_in_process || sending_resp_in_processs)
+                                   && duration > timeout) 
+        then close the connection. (w/ cleanup!)
+  2. Client Connection Timeout
+    - defined for each keep-alive connection (HttpConnection class)
+    - stored inside the request itselfs
+    - starts when the response is sent and keep-alive is true
+    - if (noting_is_happening_on_socket && duration > timeout) then close the keep-alive connection
+
+
+  3. Upstream (Backend) Timeout - CGI timeout
+    - defined for each Server class
+    - Taken from Config in each Server block
+    - Timer start when the CGI is ()-d
+    - if (cgi_in_process && duration > timeout) then kill the cgi and prepare and send error to the client
+

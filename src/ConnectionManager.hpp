@@ -69,7 +69,13 @@ private:
   void close_connection(int fd);
   bool conn_timed_out(int fd);
   bool cgi_timed_out(int fd);
-  void kill_cgi(int fd);
+
+  /**
+   * @brief takes fd of the socket, finds the associated pipe fd in the structures without external help
+   * 
+   * @param fd 
+   */
+  void kill_cgi(int connection_fd);
   bool read_cgi_pipe(HttpConnection &connection);
 
 private:
@@ -77,8 +83,9 @@ private:
   int exec_cgi(HttpConnection &connection, HttpRequest &request);
   std::string try_read_fork(HttpConnection &connection, HttpRequest &request);
 
-private:
-  void update_last_activity(HttpConnection &connection);
+// private:
+//   void update_last_activity(HttpConnection &connection);
+//   void update_last_cgi_activity(HttpConnection &connection);
 
 private:
   // system data
