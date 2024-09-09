@@ -198,6 +198,24 @@ private:
    */
   void timeout_cgi(int connection_fd);
 
+  /**
+   * @brief shutdown Server instance
+   * 
+   * Correctly clears up all connections
+   * closes the socket
+   * removes listen_fd from pollfd vector
+   * removes Server instance from the listen_servers
+   * @param listen_fd 
+   */
+  void shutdown_server(int listen_fd);
+
+  /**
+   * @brief shutdowns the webserv
+   * 
+   */
+  void shutdown();
+
+
 private: // deprecated
   int run_cgi(HttpConnection &connection, HttpRequest &request);
   int exec_cgi(HttpConnection &connection, HttpRequest &request);

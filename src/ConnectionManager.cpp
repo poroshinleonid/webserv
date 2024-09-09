@@ -488,6 +488,33 @@ void ConnectionManager::timeout_cgi(int connection_fd) {
 }
 
 
+void ConnectionManager::shutdown_server(int listen_fd) {
+  Server *srv = &(listen_servers[listen_fd]);
+  for (std::map<int, HttpConnection>::iterator it = connections.begin();
+        it != connections.end(); it++) {
+    if (it->second.serv == srv) {
+      close_connection(it->second.fd);
+    }
+  }
+  close(srv->listen_fd);
+  for (std::vector<struct pollfd>::iterator it = fds.begin();
+       it != fds.end();it++) {
+    if (it->fd == listen_fd) {
+      fds.erase(it);
+      break;
+    }
+  }
+  listen_servers.erase(listen_fd);
+}
+
+void ConnectionManager::shutdown() {
+  while (!listen_servers.empty()) {
+    std::map<int, Server>::iterator it = listen_servers.begin();
+    shutdown_server(it->first);
+  }
+}
+
+
 
 #define DEBUG
 #ifdef DEBUG

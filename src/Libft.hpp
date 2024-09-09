@@ -43,6 +43,15 @@ private:
    * @return int 
    */
   static std::string ft_iptoa(int ip_repr);
+  
+  /**
+   * @brief std::memset
+   * 
+   * @param dst 
+   * @param len 
+   * @param byte 
+   */
+  static void ft_memset(void *dst, int len, unsigned char byte);
 
 };
 

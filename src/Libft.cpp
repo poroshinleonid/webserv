@@ -59,3 +59,10 @@ std::string Libft::ft_itos(int number) {
   s = strm.str();
   return s;
 }
+
+void Libft::ft_memset(void *dst, int len, unsigned char byte) {
+  unsigned char *p = (unsigned char *)dst;
+  for (int i = 0; i < len; i++) {
+    p[i] = byte;
+  }
+}
