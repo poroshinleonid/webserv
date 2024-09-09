@@ -2,6 +2,7 @@
 #include "Config.hpp"
 #include "HttpConnection.hpp"
 #include "Server.hpp"
+#include "Libft.hpp"
 
 #include <algorithm>
 #include <cstring>
@@ -31,10 +32,6 @@ std::string get_responses_string(HttpConnection &connection) {
          "Hello world!";
 }
 
-// FIX
-#define CGI_TIMEOUT 100000
-#define CONN_TIMEOUT 100000
-
 ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
     : config(cfg), logger(log) {
   bzero(buffer, sizeof(buffer));
@@ -47,30 +44,12 @@ ConnectionManager::~ConnectionManager() {
   }
 }
 
-// returns 0 if empty string
-int ft_atoi(const std::string &s) { // FIX - move helper functions somewhere where they belong
-  return std::atoi(s.c_str());
-}
-
-int ft_atoip(const std::string &s) {
-  int result;
-  inet_pton(AF_INET, s.c_str(), &result); // FIX forbidden function
-  return result;
-}
-
-std::string ft_itos(int number) {
-  std::ostringstream strm;
-  std::string s;
-  strm << number;
-  s = strm.str();
-  return s;
-}
 
 int ConnectionManager::setup_server(Server &serv, Config &cfg) {
   try {
     // 1. Choose the port and host of each ’server’.
     serv.srv_sockaddr.sin_family = AF_INET;
-    serv.srv_sockaddr.sin_port = ft_atoi(cfg["port"].unwrap());
+    serv.srv_sockaddr.sin_port = Libft::ft_atoi(cfg["port"].unwrap());
     serv.srv_sockaddr.sin_addr.s_addr =
         Config::string_to_ip(cfg["host"].unwrap());
     bzero(serv.srv_sockaddr.sin_zero, 8); // FIX: forbidden fun
@@ -91,7 +70,7 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
     std::vector<Config> error_pages = cfg.get_vec("default_page");
     for (size_t i = 0; i < error_pages.size(); i++) {
       ErrorPage page;
-      page.page_code = ft_atoi(error_pages[i]["code"].unwrap());
+      page.page_code = Libft::ft_atoi(error_pages[i]["code"].unwrap());
       page.html_file = error_pages[i]["html_file"].unwrap();
       page.location = error_pages[i]["location"].unwrap();
       std::string tmp = error_pages[i].get_value_safely("internal");
@@ -100,7 +79,7 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
     }
 
     // 5. Limit client body size.
-    serv.client_max_body_size = ft_atoi(cfg.get_value_safely("client_max_body_size"));
+    serv.client_max_body_size = Libft::ft_atoi(cfg.get_value_safely("client_max_body_size"));
     if (serv.client_body_size == 0) {
       serv.client_body_size = Config::client_default_max_body_size;
     }
@@ -137,12 +116,12 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 }
 
 int ConnectionManager::start_server(Server &serv) {
-  serv.timeout = static_cast<double>(ft_atoi((*config)["timeout"].unwrap())) / 1000.0;
-  serv.cgi_timeout = static_cast<double>(ft_atoi((*config)["cgi_timeout"].unwrap())) / 1000.0;
+  serv.timeout = static_cast<double>(Libft::ft_atoi((*config)["timeout"].unwrap())) / 1000.0;
+  serv.cgi_timeout = static_cast<double>(Libft::ft_atoi((*config)["cgi_timeout"].unwrap())) / 1000.0;
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (new_listen_fd < 0) {
     std::string error = "can't create socket " + serv.host + ":" +
-                        ft_itos(serv.port) + " : " + strerror(errno);
+                        Libft::ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     return (-1);
   }
@@ -156,7 +135,7 @@ int ConnectionManager::start_server(Server &serv) {
   if (setsockopt(new_listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) <
       0) {
     std::string error = "can't assign address to socket" + serv.host + ":" +
-                        ft_itos(serv.port) + " : " + strerror(errno);
+                        Libft::ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     close(new_listen_fd);
     return (-1);
@@ -164,7 +143,7 @@ int ConnectionManager::start_server(Server &serv) {
   if (bind(new_listen_fd, (struct sockaddr *)&server_addr_in,
            sizeof(server_addr_in)) < 0) {
     std::string error = "can't bind socket " + serv.host + ":" +
-                        ft_itos(serv.port) + " : " + strerror(errno);
+                        Libft::ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     close(new_listen_fd);
     return (-1);
@@ -172,13 +151,13 @@ int ConnectionManager::start_server(Server &serv) {
   // FIX - load data about listen backlog from the config or from somewhere!
   if (listen(new_listen_fd, 20) == -1) {
     std::string error = "can't listen to socket" + serv.host + ":" +
-                        ft_itos(serv.port) + " : " + strerror(errno);
+                        Libft::ft_itos(serv.port) + " : " + strerror(errno);
     logger->log_error(error);
     close(new_listen_fd);
     return (-1);
   }
   std::string status_message =
-      "Server " + serv.host + ":" + ft_itos(serv.port) + " is listening!";
+      "Server " + serv.host + ":" + Libft::ft_itos(serv.port) + " is listening!";
   logger->log_info(status_message);
   serv.listen_fd = new_listen_fd;
   listen_servers[serv.listen_fd] = serv;
@@ -212,7 +191,7 @@ int ConnectionManager::setup() {
 int ConnectionManager::run() {
   if (listen_servers.empty()) {
     (*logger).log_error("No servers to run! Exitting.");
-    return -1;
+    return 1;
   }
   while (true) {
     int poll_result = poll(fds.data(), fds.size(), 10); // FIX:timeout from cfg?
@@ -223,7 +202,10 @@ int ConnectionManager::run() {
     if (poll_result == 0) {
       continue;
     }
-    handle_fds();
+    if (handle_fds()) {
+      //FIX - add complete cleanup and shut down the server correctly.
+      return -1;
+    }
   }
   return 0;
 }
@@ -248,29 +230,35 @@ int ConnectionManager::cleanup(int fd) {
   return 0;
 }
 
-// fix handle_ functions return values
+// fix handle_* functions return values
 int ConnectionManager::handle_fds() {
   bool io_happened = false;
   bool poll_vector_changed = false;
-  for (int i = 0, sz = fds.size(); i < sz && !poll_vector_changed; i++) {
+  bool fatal = false;
+  for (int i = 0, sz = fds.size(); i < sz; i++) {
     int fd = fds[i].fd;
     if (io_happened) {
       poll_vector_changed = cleanup(fd);
     } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
-      io_happened = handle_poll_problem(fd);
+      fatal = handle_poll_problem(fd);
     } else if (fds[i].revents & POLLIN) {
       io_happened = handle_poll_read(fd);
     } else if (fds[i].revents & POLLOUT) {
       io_happened = handle_poll_write(fd);
+    }
+    if (poll_vector_changed) {
+      sz--;
+    }
+    if (fatal) {
+      return -1;
     }
   }
   return 0;
 }
 
 bool ConnectionManager::handle_poll_problem(int fd) {
-
   (void)fd;
-  // FIX kill serv if err, webserv if fatal, nothing if small err
+  // FIX kill Server instance if err, return true if fatal, nothing if small err (just fix it or idk)
   logger->log_error("some poll error");
   fds[fd].revents = 0;
   return false;
@@ -298,14 +286,14 @@ bool ConnectionManager::handle_poll_read(int fd) {
   connection.update_last_activity();
   // int bytes_recvd = recv(fd, buffer, sizeof(buffer), 0);
   if (bytes_recvd < 0) {
-    logger->log_error("recv failed on socket " + ft_itos(fd) +
+    logger->log_error("recv failed on socket " + Libft::ft_itos(fd) +
                       ", closing the connection.");
     exit(1);
     close_connection(fd);
     return true;
   }
   if (bytes_recvd == 0) {
-    logger->log_info("socket " + ft_itos(fd) + "hung up.");
+    logger->log_info("socket " + Libft::ft_itos(fd) + "hung up.");
     // close if not keep-alive!
     close_connection(fd);
     return true;
@@ -313,8 +301,8 @@ bool ConnectionManager::handle_poll_read(int fd) {
   if (bytes_recvd < 4000) {
     connections[fd].recv_done = true;
   }
-  logger->log_info("Recieved " + ft_itos(bytes_recvd) + " bytes on socket " +
-                   ft_itos(fd));
+  logger->log_info("Recieved " + Libft::ft_itos(bytes_recvd) + " bytes on socket " +
+                   Libft::ft_itos(fd));
   connection.recv_stream << bufg;
   bzero(bufg, sizeof(bufg));
   // connection.recv_stream << buffer;
@@ -338,7 +326,7 @@ void ConnectionManager::handle_accept(int fd) {
   setsockopt(new_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
   if (new_fd == -1) {
     logger->log_error("Failed to accept a new connection on socket" +
-                      ft_itos(fd));
+                      Libft::ft_itos(fd));
     return;
   }
 
@@ -385,7 +373,7 @@ bool ConnectionManager::handle_poll_write(int fd) {
                         connections[fd].send_buffer.length(), 0);
   connections[fd].update_last_activity();
   if (bytes_sent < 0) {
-    logger->log_error("send failed on socket" + ft_itos(fd));
+    logger->log_error("send failed on socket" + Libft::ft_itos(fd));
     close_connection(fd);
     return true;
   }
@@ -407,7 +395,7 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
       // NB unknown waitpid error - strange pid returned
       kill_cgi(connection.fd);
       logger->log_error("waitpid returned garbage pid on socket " +
-                        ft_itos(connection.fd));
+                        Libft::ft_itos(connection.fd));
       return false;
     }
     if (!WIFEXITED(status_code)) {
@@ -429,7 +417,7 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   connection.update_last_cgi_activity();
   if (bytes_read < 0) {
     logger->log_error("read() failed on CGI pipe for socket " +
-                      ft_itos(connection.fd));
+                      Libft::ft_itos(connection.fd));
     connection.send_buffer = "INTERNAL SERVER ERROR";
     kill_cgi(connection.fd);
     return true;
@@ -470,7 +458,7 @@ bool ConnectionManager::conn_timed_out(int fd) {
   time_t now;
   now = std::time(&now);
   double connection_age = std::difftime(connections[fd].last_activity, now);
-  if (connection_age > CONN_TIMEOUT) { // FIX - get from config
+  if (connection_age > connections[fd].serv->timeout) { // FIX - get from config
     return true;
   }
   return false;
@@ -480,7 +468,7 @@ bool ConnectionManager::cgi_timed_out(int fd) {
   time_t now;
   now = std::time(&now);
   double cgi_age = std::difftime(connections[fd].last_activity, now);
-  if (cgi_age > CONN_TIMEOUT) { // FIX - get from config
+  if (cgi_age > connections[fd].serv->timeout) { // FIX - get from config
     return true;
   }
   return false;
@@ -491,7 +479,7 @@ bool ConnectionManager::cgi_timed_out(int fd) {
 void ConnectionManager::kill_cgi(int connection_fd) {
   kill(connections[connection_fd].cgi_pid, SIGKILL);
   close(connections[connection_fd].cgi_pipe[0]);
-  pipe_to_socket.erase(connections[fd].cgi_pipe[0]);
+  pipe_to_socket.erase(connections[connection_fd].cgi_pipe[0]);
   connections[connection_fd].is_cgi_running = false;
   // FIX connections[connection_fd].send_buffer.clear();
 }

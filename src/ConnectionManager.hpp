@@ -32,17 +32,25 @@ public:
 
 public:
   /**
-   * @brief Setup the web server.
+   * @brief Setup the webserv.
    * 
+   * Created Server instances for every server in the config.
+   * Fills in all of the data for every server.
    * @return int 
+   * @retval 0 on success
+   * @retval -1 if none of the servers were sucessfully set up
    */
   int setup();
 
   /**
-   * @brief Run the server.
+   * @brief Start the server.
    * 
    * @note Runs indefinitely.
+   * @note Returns on fatal poll() error or if there ar no servers
    * @return int 
+   * @retval 0 on success
+   * @retval 1 if there are no servers
+   * @retval -1 on fatal error in poll()
    */
   int run();
 
@@ -50,24 +58,117 @@ private:
   /**
    * @brief Set the up server from cfg["server"]
    * 
+   * @see Server.hpp
    * @param serv 
    * @param cfg 
    * @return int 
    */
   int setup_server(Server &serv, Config &cfg);
+
+  /**
+   * @brief Start Server instance
+   * 
+   * Enable listening socket, add it to pollfd list
+   * @param serv 
+   * @return int 
+   */
   int start_server(Server &serv);
+
+  /**
+   * @brief setup_server() and start_server()
+   * 
+   * @param cfg 
+   * @return int 
+   */
   int add_listen_server(Config &cfg);
+
+  /**
+   * @brief check timeouts for a socket
+   * 
+   * close the connection or kill the CGI if needed
+   * @param fd 
+   * @return int 
+   */
   int cleanup(int fd);
+
+  /**
+   * @brief Go through pollfd vector after poll() returned positive value
+   * 
+   * The main program loop calls it.
+   * @return int 
+   */
   int handle_fds();
+
+  /**
+   * @brief handle POLLERR and POLLNVAL
+   * 
+   * @param fd 
+   * @return true 
+   * @return false 
+   */
   bool handle_poll_problem(int fd);
+
+  /**
+   * @brief Process an fd that is ready to be read from
+   * 
+   * Can be a pipe or a socket
+   * @param fd 
+   * @return true 
+   * @return false 
+   */
   bool handle_poll_read(int fd);
+
+  /**
+   * @brief Process an fd that is ready to be written to
+   * 
+   * @param fd 
+   * @return true 
+   * @return false 
+   */
   bool handle_poll_write(int fd);
+
+  /**
+   * @brief accept a listen socket and create
+   * HttpConnection instance for the new connection
+   * 
+   * @param fd 
+   */
   void handle_accept(int fd);
 
 private:
+  /**
+   * @brief checks if CGI is saying something
+   * and processes its output
+   * 
+   * @param connection 
+   * @return true 
+   * @return false 
+   */
   bool handle_cgi_output(HttpConnection &connection);
+
+  /**
+   * @brief closes the connection, cleans up
+   * 
+   * @param fd 
+   */
   void close_connection(int fd);
+
+  /**
+   * @brief checks if the connection has timed out
+   * 
+   * @param fd 
+   * @return true 
+   * @return false 
+   */
   bool conn_timed_out(int fd);
+
+  /**
+   * @brief 
+   * 
+   * @param fd 
+   * @return true 
+   * @return false 
+   */
   bool cgi_timed_out(int fd);
 
   /**
@@ -107,50 +208,8 @@ private:
 
   // system buffers
   char buffer[4096];     // FIX is it the right size?
-  char cgi_buffer[1024]; // FIX is it the right size?
+  char cgi_buffer[1024]; // FIX is it the right size
 
-// private:
-//   void handle_fds();
-//   void handle_read(int fd);
-//   void handle_accept(int fd);
-//   int handle_cgi_output(int cgi_pipe_fd);
-//   void handle_incoming_data(int fd);
-//   int handle_write(int fd);
-
-//   int handle_request_if_ready(int fd);
-//   void check_timeouts(int fd);
-
-// private:
-//   int accept_(); // accept new connection, returns new_fd. updates (or not?)
-//   read_buffers and write_buffers maps. int recv_chunk_(int fd); // recieves a
-//   chunk of data int send_chunk_(int fd); // send a chunk of data
-
-// /*
-// data structures to update:
-//   1. all_fds_
-//   2. max_fd_
-//   3. read/write buffer maps
-//   4. cgi fds
-//   5. cgi maps
-// */
-
-// // static data, does not change
-// private:
-//   std::string ip_str_;
-//   int port_;
-//   int listen_backlog_;
-//   int listen_fd_;
-//   sockaddr_in server_addr_in;
-
-// // dynamic data, can change with each select() iteration
-// private:
-//   fd_set all_fds_;
-//   fd_set read_fds_;
-//   fd_set write_fds_;
-//   fd_set cgi_fds_;
-//   int max_fd_;
-
-// // dynamic data structures, can change with each select() iteration
 #define DEBUG
 #ifdef DEBUG
 public:
