@@ -49,6 +49,9 @@ clean:
 
 fclean: clean
 	rm -f $(NAME)
+	rm -rf $(NAME).dSYM
+	rm -f test/*/*.out
+	rm -rf test/*/*.out.dSYM
 
 re: fclean all
 
