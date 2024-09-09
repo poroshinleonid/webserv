@@ -1,18 +1,14 @@
-7. Add descriptions (detailed) to every function that I have written
-
-8. Fix all of the FI_X  comments everywhere.
-
-9. Create a list of my modules that I am going to write tests for
-10. Write and run tests, fix bugs if they arise.
-
-
-
+write functions:
+[x] 1. Libft::ft_inet_pton
+[x] 2. ConnectionManager::terminate() function that cleans everything up and stops the server.
+[x] 3. Libft::memset for bzero
+[x] 3. A function to shut down one Server instance with all its derivative objects.
+4. handle_poll_problem
+5. run->what if handle_fds returns -1 - close either one server or the whole webserv correctly
 
 
-write:
-1. ft_htonl
-2. terminate() function that cleans everything up. Call it from main after calling run().
-
+5. Write test and case-by-case comparisons for all of the libft methods.
+6. Replace all non-libft functions to libft methods
 
 
 
@@ -129,7 +125,7 @@ we are reading from the cgi in a blocking way in this architecture
 
 
 todo:
-FIXes
+FI_Xes
 Cleanup, timeouts, etc
 
 
@@ -297,6 +293,13 @@ remove bzero - it's not allowed'
 [x] 4. Add setting timeout values from config to ConnectionManager Setup
 [x] 5. Add timer tracking everywhere
 [x] 6. Add cleanup everywhere where it is necessary
+
+[x] 1. Add timeout checks not only in cleanup() but before every action that is taken on the connection.
+[x] 2. use conn_timed_out in cleanup()
+[x] 3. use cgi_timed_out also (compare them with what I have done in cleanup())
+[x] 7. Add descriptions (detailed) to every function that I have written
+[x] 8. fix libft functions that already exist!
+
 
 
 1. Make a list of timeouts that I need to keep track of
