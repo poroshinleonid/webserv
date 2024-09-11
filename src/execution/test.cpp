@@ -17,5 +17,5 @@ int main() {
     "def\r\n";
     std::stringstream s(httpRequest);
     HttpRequest req(s);
-    std::cout << req.get_header_at("Accept ") << '\n';
+    std::cout << req.get_url() << '\n';
 }
