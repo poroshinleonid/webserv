@@ -1,4 +1,4 @@
-#include "HttpParse.hpp"
+#include "HttpRequest.hpp"
 #include "Base.hpp"
 
 #define CRLF "\r\n"
