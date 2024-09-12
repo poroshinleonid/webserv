@@ -197,14 +197,13 @@ int ConnectionManager::run() {
     int poll_result = poll(fds.data(), fds.size(), 10); // REVISE:timeout from cfg?
     if (poll_result == -1) {
       logger->log_error("fatal error in poll(): " + static_cast<std::string>(strerror(errno)));
-      return -1;
+      return -1; //REVISE where is terminate()?
     }
     if (poll_result == 0) {
       continue;
     }
     if (handle_fds()) { // -1 on fatal error, 0 on success
-
-      //add complete cleanup and shut down the Server(or webserv?) correctly.
+      shutdown();
       return -1;
     }
   }
@@ -226,31 +225,34 @@ int ConnectionManager::cleanup(int fd) {
 // Ensure handle_* functions return values are correct
 int ConnectionManager::handle_fds() {
   bool io_happened = false;
-  bool fatal = false;
-  for (size_t i = 0; i < fds.size(); i++) {
+  size_t pollvec_len = fds.size();
+  for (size_t i = 0; i < pollvec_len; i++) {
     int fd = fds[i].fd;
     if (io_happened) {
       cleanup(fd);
-    } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
-      fatal = handle_poll_problem(fd);
+    } else if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+      handle_poll_problem(fd);
     } else if (fds[i].revents & POLLIN) {
       io_happened = handle_poll_read(fd);
     } else if (fds[i].revents & POLLOUT) {
       io_happened = handle_poll_write(fd);
     }
-    if (fatal) {
-      return -1;
-    }
     fds[fd].revents = 0;
+    pollvec_len = fds.size();
   }
   return 0;
 }
 
-bool ConnectionManager::handle_poll_problem(int fd) {
-  (void)fd;
-  logger->log_error("some poll error");
-  fds[fd].revents = 0;
-  return false;
+void ConnectionManager::handle_poll_problem(int fd) {
+  if (fds[fd].revents & POLLHUP) {
+    (*logger).log_error("Socket " + Libft::ft_itos(fd) + " hung up incorrectly (POLLHUP).");
+  } else if (fds[fd].revents & POLLNVAL) {
+    (*logger).log_error("Socket " + Libft::ft_itos(fd) + " is closed unexpectedly (POLLINVAL).");
+    connections[fd].socket_closed = true;
+  } else if (fds[fd].revents & POLLERR) {
+    (*logger).log_error("Socket " + Libft::ft_itos(fd) + " failed (POLLERR).");
+  }
+  close_connection(fd);
 }
 
 // when recv error don't need to kill cgi
@@ -439,8 +441,10 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
  * @param fd 
  */
 void ConnectionManager::close_connection(int fd) {
-  close(fd);
-  if (connections[fd].is_cgi_running) {
+  if (connections[fd].socket_closed == false) {
+    close(fd);
+  }
+  if (connections[fd].is_cgi_running == true) {
     kill_cgi(fd);
   }
   for (std::vector<struct pollfd>::iterator it = fds.begin();

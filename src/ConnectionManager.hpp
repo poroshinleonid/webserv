@@ -109,7 +109,7 @@ private:
    * @return true 
    * @return false 
    */
-  bool handle_poll_problem(int fd);
+  void handle_poll_problem(int fd);
 
   /**
    * @brief Process an fd that is ready to be read from

@@ -24,7 +24,7 @@ HttpConnection::HttpConnection(Config *cfg, Server *srv)
   is_connected = true;
   is_cgi_running = false;
   cgi_finished = false;
-  should_die = false;
+  socket_closed = false;
   is_response_ready = false;
   is_keep_alive = false;
   header_is_parsed = false;
@@ -42,7 +42,7 @@ HttpConnection::HttpConnection(Config *cfg, Server *srv)
 //      busy(false), is_connected(true),
 //      is_cgi_running(false),
 //      cgi_response(""),
-//      cgi_finished(false), should_die(false),
+//      cgi_finished(false), socket_closed(false),
 //      is_response_ready(false),
 //      is_keep_alive(false), header_is_parsed(false),
 //      body_is_read(false), cgi_pid(0) {
@@ -63,7 +63,7 @@ HttpConnection::HttpConnection(HttpConnection const &other)
       content_length(other.content_length), busy(other.busy),
       is_connected(other.is_connected), is_cgi_running(other.is_cgi_running),
       cgi_response(other.cgi_response), cgi_finished(other.cgi_finished),
-      cgi_result(other.cgi_result), should_die(other.should_die),
+      cgi_result(other.cgi_result), socket_closed(other.socket_closed),
       is_response_ready(other.is_response_ready),
       is_keep_alive(other.is_keep_alive),
       header_is_parsed(other.header_is_parsed),
@@ -94,7 +94,7 @@ HttpConnection &HttpConnection::operator=(const HttpConnection &other) {
   cgi_response = other.cgi_response;
   cgi_finished = other.cgi_finished;
   cgi_result = other.cgi_result;
-  should_die = other.should_die;
+  socket_closed = other.socket_closed;
   is_response_ready = other.is_response_ready;
   is_keep_alive = other.is_keep_alive;
   header_is_parsed = other.header_is_parsed;
@@ -134,7 +134,7 @@ void HttpConnection::print_connection() {
   std::cout << cgi_response << " ";
   std::cout << cgi_finished << " ";
   std::cout << cgi_result << " ";
-  std::cout << should_die << " ";
+  std::cout << socket_closed << " ";
   std::cout << is_response_ready << " ";
   std::cout << is_keep_alive << " ";
   std::cout << header_is_parsed << " ";

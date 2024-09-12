@@ -38,7 +38,9 @@ int main(int argc, char **argv) {
   main_connection.setup();
   main_connection.print_connection_manager();
   std::cout << "Running server" << std::endl;
-  main_connection.run();
-
+  if (main_connection.run() == -1) {
+    std::cout << "server died in a horrible way";
+    return 1;
+  }
   return (0);
 }

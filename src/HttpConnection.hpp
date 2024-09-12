@@ -56,7 +56,7 @@ public:
   std::string cgi_response;
   bool cgi_finished;
   pid_t cgi_result;
-  bool should_die;
+  bool socket_closed;
   bool is_response_ready;
   bool is_keep_alive;
   bool header_is_parsed;
