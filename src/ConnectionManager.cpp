@@ -246,7 +246,6 @@ int ConnectionManager::handle_fds() {
     } else if (fds[i].revents & POLLOUT) {
       io_happened = handle_poll_write(fd);
     }
-    fds[fd].revents = 0;
     pollvec_len = fds.size();
   }
   return 0;
@@ -261,6 +260,7 @@ void ConnectionManager::handle_revent_problem(int fd) {
   } else if (fds[fd].revents & POLLERR) {
     (*logger).log_error("Socket " + Libft::ft_itos(fd) + " failed (POLLERR).");
   }
+  // fds[fd].revents = 0;
   close_connection(fd);
 }
 
@@ -268,6 +268,7 @@ void ConnectionManager::handle_revent_problem(int fd) {
 // because re don't recv if it is running
 // can I recv() while CGI is running? I think NO.
 bool ConnectionManager::handle_poll_read(int fd) {
+  // fds[fd].revents = 0;
   HttpConnection &connection = connections[fd];
   if (connection.is_cgi_running) {
     if (cgi_timed_out(fd)) {
@@ -275,7 +276,6 @@ bool ConnectionManager::handle_poll_read(int fd) {
     }
     return false;
   }
-  fds[fd].revents = 0;
   if (connections[fd].recv_done == true) {
     return false;
   }
@@ -352,11 +352,11 @@ void ConnectionManager::handle_accept(int fd) {
   connection.fd = new_fd;
   connections[new_fd] = connection;
   connection.update_last_activity();
-  fds[fd].revents = 0;
+  // fds[fd].revents = 0;
 }
 
 bool ConnectionManager::handle_poll_write(int fd) {
-  fds[fd].revents = 0;
+  // fds[fd].revents = 0;
   if (conn_timed_out(fd)) {
     close_connection(fd);
     return false;

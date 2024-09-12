@@ -3,6 +3,7 @@
 
 #include <sstream>
 #include <string>
+#include <cstdlib>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -24,7 +25,8 @@ Libft	&Libft::operator=(const Libft &other) {
 
 
 int Libft::ft_atoi(const std::string &s) {
-  return std::atoi(s.c_str());
+  return static_cast<int>(std::strtod(s.c_str(), NULL));
+  // return std::atoi(s.c_str());
 }
 
 unsigned long Libft::ft_atoip(const std::string &s) {
