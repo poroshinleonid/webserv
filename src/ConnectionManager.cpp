@@ -23,7 +23,10 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+bool sig_stop = false;
+
 std::string get_responses_string(HttpConnection &connection) {
+  std::cout << connection.recv_stream.str();
   (void)connection;
   return "HTTP/1.1 200 OK\r\n"
          "Content-Type: text/plain\r\n"
@@ -174,7 +177,13 @@ int ConnectionManager::add_listen_server(Config &cfg) {
   return start_server(serv);
 }
 
+void sighandle(int signum) {
+  (void)signum;
+  sig_stop = true;
+}
+
 int ConnectionManager::setup() {
+  signal(SIGINT, sighandle);
   std::vector<Config> server_configs;
   server_configs = config->get_vec("server");
   for (size_t i = 0; i < server_configs.size(); i++) {
@@ -193,32 +202,32 @@ int ConnectionManager::run() {
     (*logger).log_error("No servers to run! Exitting.");
     return 1;
   }
-  while (true) {
+  while (!sig_stop) {
     int poll_result = poll(fds.data(), fds.size(), 10); // REVISE:timeout from cfg?
     if (poll_result == -1) {
-      logger->log_error("fatal error in poll(): " + static_cast<std::string>(strerror(errno)));
-      return -1; //REVISE where is terminate()?
+      return handle_poll_error(errno); //REVISE where is terminate()?
     }
     if (poll_result == 0) {
       continue;
     }
-    if (handle_fds()) { // -1 on fatal error, 0 on success
-      shutdown();
+    if (handle_fds() != 0) { // -1 on fatal error, 0 on success
       return -1;
     }
   }
+  // shutdown();
   return 0;
 }
 
 int ConnectionManager::cleanup(int fd) {
-  if (connections[fd].is_cgi_running && cgi_timed_out(fd)) {
-    timeout_cgi(fd);
-    return 0;
-  }
-  if (conn_timed_out(fd)) {
-      close_connection(fd);
-    return 1;
-  }
+(void)fd;
+  // if (connections[fd].is_cgi_running && cgi_timed_out(fd)) {
+  //   timeout_cgi(fd);
+  //   return 0;
+  // }
+  // if (conn_timed_out(fd)) {
+  //     close_connection(fd);
+  //   return 1;
+  // }
   return 0;
 }
 
@@ -231,7 +240,7 @@ int ConnectionManager::handle_fds() {
     if (io_happened) {
       cleanup(fd);
     } else if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
-      handle_poll_problem(fd);
+      handle_revent_problem(fd);
     } else if (fds[i].revents & POLLIN) {
       io_happened = handle_poll_read(fd);
     } else if (fds[i].revents & POLLOUT) {
@@ -243,7 +252,7 @@ int ConnectionManager::handle_fds() {
   return 0;
 }
 
-void ConnectionManager::handle_poll_problem(int fd) {
+void ConnectionManager::handle_revent_problem(int fd) {
   if (fds[fd].revents & POLLHUP) {
     (*logger).log_error("Socket " + Libft::ft_itos(fd) + " hung up incorrectly (POLLHUP).");
   } else if (fds[fd].revents & POLLNVAL) {
@@ -279,7 +288,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
     return handle_cgi_output(connections[pipe_to_socket[fd]]);
   }
   connection.busy = true;
-  (*logger).log_info("recv on socket" + Libft::ft_itos(fd));
+  (*logger).log_info("recv on socket " + Libft::ft_itos(fd));
   char bufg[4001];
   int bytes_recvd = recv(fd, bufg, 4000, 0);
   connection.update_last_activity();
@@ -321,13 +330,12 @@ void ConnectionManager::handle_accept(int fd) {
   socklen_t socket_address_length = sizeof(socket_address);
   int new_fd = accept(fd, (sockaddr *)&socket_address, &socket_address_length);
   int one = 1;
-  setsockopt(new_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
   if (new_fd == -1) {
     logger->log_error("Failed to accept a new connection on socket" +
                       Libft::ft_itos(fd));
     return;
   }
-
+  setsockopt(new_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
   std::cout << "ACCEPTED SOCKET " << fd << ", new one is " << new_fd
             << std::endl;
 
@@ -512,11 +520,35 @@ void ConnectionManager::shutdown_server(int listen_fd) {
 }
 
 void ConnectionManager::shutdown() {
+  logger->log_info("Shutting down the server!");
   while (!listen_servers.empty()) {
     std::map<int, Server>::iterator it = listen_servers.begin();
     shutdown_server(it->first);
   }
 }
+
+int ConnectionManager::handle_poll_error(int err_num) {
+  if (err_num == EFAULT) {
+    logger->log_error("poll() error - EFAULT");
+    return -1;
+  } else if (err_num == EINTR) {
+    shutdown();
+    return 0;
+  } else if (err_num == EINVAL) {
+    logger->log_error("poll() error - EFAULT");
+    return -1;
+  } else if (err_num == EINVAL) {
+    logger->log_error("poll() error - EFAULT");
+    return -1;
+  } else if (err_num == ENOMEM) {
+    logger->log_error("poll() error - EFAULT");
+    return -1;
+  } else {
+    logger->log_error("poll() error - Unknown");
+    return -1;
+  }
+}
+
 
 
 

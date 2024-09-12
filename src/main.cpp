@@ -10,7 +10,9 @@
 
 #define DEBUG
 
+
 int main(int argc, char **argv) {
+  setvbuf(stdout, NULL, _IONBF, 0); // cout no buffer
   if (argc != 2) {
     std::cout << "gib args (conf file)\n";
 
@@ -42,5 +44,6 @@ int main(int argc, char **argv) {
     std::cout << "server died in a horrible way";
     return 1;
   }
+  std::cout << "server was shut down correctly";
   return (0);
 }

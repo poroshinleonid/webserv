@@ -20,6 +20,8 @@
 #include <poll.h>
 #include <sys/socket.h>
 
+
+
 class ConnectionManager {
 private:
   ConnectionManager();
@@ -109,7 +111,7 @@ private:
    * @return true 
    * @return false 
    */
-  void handle_poll_problem(int fd);
+  void handle_revent_problem(int fd);
 
   /**
    * @brief Process an fd that is ready to be read from
@@ -214,6 +216,11 @@ private:
    * 
    */
   void shutdown();
+
+  int handle_poll_error(int err_num);
+
+// void sighandle(int signum);
+
 
 
 private: // deprecated
