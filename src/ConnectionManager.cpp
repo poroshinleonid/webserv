@@ -26,13 +26,20 @@
 bool sig_stop = false;
 
 std::string get_responses_string(HttpConnection &connection) {
-  std::cout << connection.recv_stream.str();
+  std::string st = connection.recv_stream.str();
+  // if (st.find("keep-alive")) {
+  if (true) {
+    connection.is_keep_alive = true;
+  }
+  std::cout << "Request:\t" << st << std::endl;
   (void)connection;
-  return "HTTP/1.1 200 OK\r\n"
+  std::string resp = "HTTP/1.1 200 OK\r\n"
          "Content-Type: text/plain\r\n"
          "Content-Length: 12\r\n"
          "\r\n"
-         "Hello world!";
+         "Hello, world!" + 
+         st;
+  return resp;
 }
 
 ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
@@ -301,9 +308,11 @@ bool ConnectionManager::handle_poll_read(int fd) {
   }
   if (bytes_recvd == 0) {
     // close if not keep-alive!
-    logger->log_info("socket " + Libft::ft_itos(fd) + "hung up.");
-    close_connection(fd);
-    return true;
+    if (connection.is_keep_alive == false) {
+      logger->log_info("socket " + Libft::ft_itos(fd) + "hung up.");
+      close_connection(fd);
+      return true;
+    }
   }
   if (bytes_recvd < 4000) {
     connections[fd].recv_done = true;
@@ -366,14 +375,14 @@ bool ConnectionManager::handle_poll_write(int fd) {
       timeout_cgi(fd);
     }
     return false;
-    // return handle_cgi_output(connections[fd]);
-    // can not do it because we didn't check if poll() said we even can read() form the pipe!
+    // return handle_cgi_output(connections[fd]); // - removed. Can 
+    // not do it because we didn't check if poll() said we even can read() form the pipe!
   }
 
   if (connections[fd].send_buffer.empty()) {
     return false;
   }
-
+  // std::cout << "\tSENDING:\t" << connections[fd].send_buffer << std::endl;
   int bytes_sent = send(fd, connections[fd].send_buffer.c_str(),
                         connections[fd].send_buffer.length(), 0);
   connections[fd].update_last_activity();
