@@ -27,20 +27,37 @@ bool sig_stop = false;
 
 std::string get_responses_string(HttpConnection &connection) {
   std::string st = connection.recv_stream.str();
-  // if (st.find("keep-alive")) {
-  if (true) {
+  std::string answ = "HTTP/1.1 200 OK\r\n";
+  if (st.find("keep-alive")) {
+  // if (true) {
     connection.is_keep_alive = true;
+    answ += "Connection: keep-alive\r\n";
   }
-  std::cout << "Request:\t" << st << std::endl;
-  (void)connection;
-  std::string resp = "HTTP/1.1 200 OK\r\n"
-         "Content-Type: text/plain\r\n"
-         "Content-Length: 12\r\n"
-         "\r\n"
-         "Hello, world!" + 
-         st;
-  return resp;
+  answ += "Content-Type: text/plain\r\n"
+          "Content-Length: 12\r\n";
+  answ += "\r\n"
+         "Hello world!" + Libft::ft_itos(connection.serv->srv_sockaddr.sin_port);
+  // std::cout << connection.recv_stream.str();
+  connection.recv_done = true;
+  return answ;
 }
+
+// std::string get_responses_string(HttpConnection &connection) {
+//   std::string st = connection.recv_stream.str();
+//   // if (st.find("keep-alive")) {
+//   if (true) {
+//     connection.is_keep_alive = true;
+//   }
+//   std::cout << "Request:\t" << st << std::endl;
+//   (void)connection;
+//   std::string resp = "HTTP/1.1 200 OK\r\n"
+//          "Content-Type: text/plain\r\n"
+//          "Content-Length: 12\r\n"
+//          "\r\n"
+//          "Hello, world!" + 
+//          st;
+//   return resp;
+// }
 
 ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
     : config(cfg), logger(log) {
@@ -171,7 +188,7 @@ int ConnectionManager::start_server(Server &serv) {
   logger->log_info(status_message);
   serv.listen_fd = new_listen_fd;
   listen_servers[serv.listen_fd] = serv;
-  struct pollfd poll_fd = {serv.listen_fd, POLLIN | POLLOUT, 0};
+  struct pollfd poll_fd = {serv.listen_fd, POLLIN, 0};
   fds.push_back(poll_fd);
   return 0;
 }
@@ -246,7 +263,7 @@ int ConnectionManager::handle_fds() {
     int fd = fds[i].fd;
     if (io_happened) {
       cleanup(fd);
-    } else if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL)) {
+    } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
       handle_revent_problem(fd);
     } else if (fds[i].revents & POLLIN) {
       io_happened = handle_poll_read(fd);
@@ -259,15 +276,16 @@ int ConnectionManager::handle_fds() {
 }
 
 void ConnectionManager::handle_revent_problem(int fd) {
-  if (fds[fd].revents & POLLHUP) {
-    (*logger).log_error("Socket " + Libft::ft_itos(fd) + " hung up incorrectly (POLLHUP).");
-  } else if (fds[fd].revents & POLLNVAL) {
+  // if (fds[find_fd_index(fd)].revents & POLLHUP) {
+  //   (*logger).log_error("Socket " + Libft::ft_itos(fd) + " hung up incorrectly (POLLHUP).");
+  // } else 
+  if (fds[find_fd_index(fd)].revents & POLLNVAL) {
     (*logger).log_error("Socket " + Libft::ft_itos(fd) + " is closed unexpectedly (POLLINVAL).");
     connections[fd].socket_closed = true;
-  } else if (fds[fd].revents & POLLERR) {
+  } else if (fds[find_fd_index(fd)].revents & POLLERR) {
     (*logger).log_error("Socket " + Libft::ft_itos(fd) + " failed (POLLERR).");
   }
-  // fds[fd].revents = 0;
+  // fds[find_fd_index(fd)].revents = 0;
   close_connection(fd);
 }
 
@@ -275,7 +293,8 @@ void ConnectionManager::handle_revent_problem(int fd) {
 // because re don't recv if it is running
 // can I recv() while CGI is running? I think NO.
 bool ConnectionManager::handle_poll_read(int fd) {
-  // fds[fd].revents = 0;
+  // fds[find_fd_index(fd)].revents = static_cast<short>(0);
+  // (*logger).log_info("poll() read on socket " + Libft::ft_itos(fd));
   HttpConnection &connection = connections[fd];
   if (connection.is_cgi_running) {
     if (cgi_timed_out(fd)) {
@@ -283,10 +302,12 @@ bool ConnectionManager::handle_poll_read(int fd) {
     }
     return false;
   }
-  if (connections[fd].recv_done == true) {
+  if (connection.recv_done == true) {
     return false;
   }
+  (*logger).log_error("---------------------------------" + Libft::ft_itos(fd));
   if (listen_servers.find(fd) != listen_servers.end()) {
+    (*logger).log_info("poll() read on SERVER socket " + Libft::ft_itos(fd));
     handle_accept(fd);
     return true;
   }
@@ -306,16 +327,10 @@ bool ConnectionManager::handle_poll_read(int fd) {
     close_connection(fd);
     return true;
   }
-  if (bytes_recvd == 0) {
-    // close if not keep-alive!
-    if (connection.is_keep_alive == false) {
-      logger->log_info("socket " + Libft::ft_itos(fd) + "hung up.");
-      close_connection(fd);
-      return true;
-    }
-  }
   if (bytes_recvd < 4000) {
-    connections[fd].recv_done = true;
+    connection.recv_done = true;
+    fds[find_fd_index(fd)].events |= POLLOUT;
+    // fds[find_fd_index(fd)].events
   }
   logger->log_info("Recieved " + Libft::ft_itos(bytes_recvd) + " bytes on socket " +
                    Libft::ft_itos(fd));
@@ -325,12 +340,21 @@ bool ConnectionManager::handle_poll_read(int fd) {
   // bzero(buffer, sizeof(buffer));
   std::string response_string = get_responses_string(connection);
   if (response_string.empty() && connection.is_cgi_running == true) {
-    struct pollfd new_pollfd_struct = {connection.cgi_pipe[1], POLLIN | POLLOUT,
+    struct pollfd new_pollfd_struct = {connection.cgi_pipe[1], POLLIN,
                                        0};
     fds.push_back(new_pollfd_struct);
     pipe_to_socket[connection.cgi_pipe[0]] = fd;
   }
   connection.send_buffer.append(response_string);
+  if (bytes_recvd == 0 && connection.recv_done && !connection.is_keep_alive) {
+    // close if not keep-alive!
+    // if (connection.is_keep_alive == false) {
+    if (true) {
+      logger->log_info("socket " + Libft::ft_itos(fd) + " hung up gracefully.");
+      close_connection(fd);
+      return true;
+    }
+  }
   return true;
 }
 
@@ -345,27 +369,21 @@ void ConnectionManager::handle_accept(int fd) {
     return;
   }
   setsockopt(new_fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(int));
-  std::cout << "ACCEPTED SOCKET " << fd << ", new one is " << new_fd
-            << std::endl;
+  (*logger).log_info("Accepted new connection " + Libft::ft_itos(new_fd) + " on socket " + Libft::ft_itos(fd));
 
-  // REVISE - crasheson thisparagraph
   struct pollfd new_pollfd_struct;
   new_pollfd_struct.fd = new_fd;
-  new_pollfd_struct.events = POLLIN | POLLOUT;
-  new_pollfd_struct.revents = 0;
+  new_pollfd_struct.events = POLLIN;
+  // fds[find_fd_index(fd)].revents = static_cast<short>(0);
   fds.push_back(new_pollfd_struct);
-  // write(STDOUT_FILENO, "A", 1);
-  // printf("SDFSFSDF");
-  // std::cout << "EEEEEE";
   HttpConnection connection(config, &listen_servers[fd]);
   connection.fd = new_fd;
   connections[new_fd] = connection;
   connection.update_last_activity();
-  // fds[fd].revents = 0;
 }
 
 bool ConnectionManager::handle_poll_write(int fd) {
-  // fds[fd].revents = 0;
+  // fds[find_fd_index(fd)].revents = static_cast<short>(0);
   if (conn_timed_out(fd)) {
     close_connection(fd);
     return false;
@@ -382,7 +400,6 @@ bool ConnectionManager::handle_poll_write(int fd) {
   if (connections[fd].send_buffer.empty()) {
     return false;
   }
-  // std::cout << "\tSENDING:\t" << connections[fd].send_buffer << std::endl;
   int bytes_sent = send(fd, connections[fd].send_buffer.c_str(),
                         connections[fd].send_buffer.length(), 0);
   connections[fd].update_last_activity();
@@ -393,6 +410,7 @@ bool ConnectionManager::handle_poll_write(int fd) {
   }
   connections[fd].send_buffer.erase(0, bytes_sent);
   if (connections[fd].send_buffer.empty()) {
+    fds[find_fd_index(fd)].events = POLLIN;
     connections[fd].recv_done = false;
   }
   return true;
@@ -511,11 +529,16 @@ void ConnectionManager::timeout_cgi(int connection_fd) {
 
 void ConnectionManager::shutdown_server(int listen_fd) {
   Server *srv = &(listen_servers[listen_fd]);
+  // FIX crashes idk, maybe create a copy of connections so we don't modify what is inside for parantheses?
   for (std::map<int, HttpConnection>::iterator it = connections.begin();
-        it != connections.end(); it++) {
+        it != connections.end();) {
     if (it->second.serv == srv) {
-      close_connection(it->second.fd);
+      int fd_to_remove = it->second.fd;
+      it++;
+      close_connection(fd_to_remove);
+      continue;
     }
+    it++;
   }
   close(srv->listen_fd);
   for (std::vector<struct pollfd>::iterator it = fds.begin();
@@ -558,6 +581,15 @@ int ConnectionManager::handle_poll_error(int err_num) {
   }
 }
 
+int ConnectionManager::find_fd_index(int system_fd) {
+  for (size_t i = 0; i < fds.size(); i++) {
+    if (fds[i].fd == system_fd) {
+      return i;
+    }
+  }
+  throw std::out_of_range("The pollfd struct with the sought-after ->fd is not found");
+  return 0;
+}
 
 
 

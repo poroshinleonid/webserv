@@ -218,6 +218,7 @@ private:
   void shutdown();
 
   int handle_poll_error(int err_num);
+  int find_fd_index(int system_fd);
 
 // void sighandle(int signum);
 

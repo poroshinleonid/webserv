@@ -1,11 +1,16 @@
-write functions:
-[x] 1. Libft::ft_inet_pton
-[x] 2. ConnectionManager::terminate() function that cleans everything up and stops the server.
-[x] 3. Libft::memset for bzero
-[x] 3. A function to shut down one Server instance with all its derivative objects.
-4. handle_poll_problem
-5. run->what if handle_fds returns -1 - close either one server or the whole webserv correctly
+for some reason the socket hangs up.....
 
+
+
+std::string get_responses_string(HttpConnection &connection) {
+  // std::cout << connection.recv_stream.str();
+  (void)connection;
+  return "HTTP/1.1 200 OK\r\n"
+         "Content-Type: text/plain\r\n"
+         "Content-Length: 12\r\n"
+         "\r\n"
+         "Hello world!" + Libft::ft_itos(connection.serv->srv_sockaddr.sin_port);
+}
 
 5. Write test and case-by-case comparisons for all of the libft methods.
 6. Replace all non-libft functions to libft methods
@@ -14,16 +19,6 @@ write functions:
 
 
 ----------------------------------------------------------------------------------------------------------------------------------
-
-  4. Gzip Compression Timeout / write timeout
-    - defined in each HttpConnection
-    - stored in Config (and has a defalut)
-    - starts before writing to the disk
-    - checked before each write()
-    - if (timed out) then stop writing, remove the file and send error back to the client
-
-
-
 
 Write route parser
 dffdffdf
@@ -299,6 +294,14 @@ remove bzero - it's not allowed'
 [x] 3. use cgi_timed_out also (compare them with what I have done in cleanup())
 [x] 7. Add descriptions (detailed) to every function that I have written
 [x] 8. fix libft functions that already exist!
+
+write functions:
+[x] 1. Libft::ft_inet_pton
+[x] 2. ConnectionManager::terminate() function that cleans everything up and stops the server.
+[x] 3. Libft::memset for bzero
+[x] 3. A function to shut down one Server instance with all its derivative objects.
+[x] 4. handle_poll_problem
+[x] 5. run->what if handle_fds returns -1 - close either one server or the whole webserv correctly
 
 
 
