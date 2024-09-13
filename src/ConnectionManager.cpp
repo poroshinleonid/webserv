@@ -27,9 +27,12 @@ bool sig_stop = false;
 
 std::string get_responses_string(HttpConnection &connection) {
   std::string st = connection.recv_stream.str();
+  connection.recv_stream.clear();
+  // write(1, "REQ", 3);
+  // std::cout << "REQUEST::::" << st << std::endl;
   std::string answ = "HTTP/1.1 200 OK\r\n";
-  if (st.find("keep-alive")) {
-  // if (true) {
+  // if (st.find("keep-alive")) {
+  if (true) {
     connection.is_keep_alive = true;
     answ += "Connection: keep-alive\r\n";
   }
@@ -319,6 +322,15 @@ bool ConnectionManager::handle_poll_read(int fd) {
   (*logger).log_info("recv on socket " + Libft::ft_itos(fd));
   char bufg[4001];
   int bytes_recvd = recv(fd, bufg, 4000, 0);
+  if (bytes_recvd == 0 && connection.recv_done && !connection.is_keep_alive) {
+    // close if not keep-alive!
+    // if (connection.is_keep_alive == false) {
+    if (true) {
+      logger->log_info("socket " + Libft::ft_itos(fd) + " hung up gracefully.");
+      close_connection(fd);
+      return true;
+    }
+  }
   connection.update_last_activity();
   if (bytes_recvd < 0) {
     logger->log_error("recv failed on socket " + Libft::ft_itos(fd) +
@@ -334,6 +346,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   }
   logger->log_info("Recieved " + Libft::ft_itos(bytes_recvd) + " bytes on socket " +
                    Libft::ft_itos(fd));
+  logger->log_info(bufg);
   connection.recv_stream << bufg;
   bzero(bufg, sizeof(bufg));
   // connection.recv_stream << buffer;
@@ -346,15 +359,6 @@ bool ConnectionManager::handle_poll_read(int fd) {
     pipe_to_socket[connection.cgi_pipe[0]] = fd;
   }
   connection.send_buffer.append(response_string);
-  if (bytes_recvd == 0 && connection.recv_done && !connection.is_keep_alive) {
-    // close if not keep-alive!
-    // if (connection.is_keep_alive == false) {
-    if (true) {
-      logger->log_info("socket " + Libft::ft_itos(fd) + " hung up gracefully.");
-      close_connection(fd);
-      return true;
-    }
-  }
   return true;
 }
 
