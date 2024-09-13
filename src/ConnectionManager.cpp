@@ -39,9 +39,10 @@ std::string get_responses_string(HttpConnection &connection) {
   answ += "Content-Type: text/plain\r\n"
           "Content-Length: 12\r\n";
   answ += "\r\n"
-         "Hello world!" + Libft::ft_itos(connection.serv->srv_sockaddr.sin_port);
+         "Hello world!";
   // std::cout << connection.recv_stream.str();
   connection.recv_done = true;
+  // std::cout << answ;
   return answ;
 }
 
@@ -279,9 +280,9 @@ int ConnectionManager::handle_fds() {
 }
 
 void ConnectionManager::handle_revent_problem(int fd) {
-  // if (fds[find_fd_index(fd)].revents & POLLHUP) {
-  //   (*logger).log_error("Socket " + Libft::ft_itos(fd) + " hung up incorrectly (POLLHUP).");
-  // } else 
+  if (fds[find_fd_index(fd)].revents & POLLHUP) {
+    (*logger).log_error("Socket " + Libft::ft_itos(fd) + " hung up incorrectly (POLLHUP).");
+  } else 
   if (fds[find_fd_index(fd)].revents & POLLNVAL) {
     (*logger).log_error("Socket " + Libft::ft_itos(fd) + " is closed unexpectedly (POLLINVAL).");
     connections[fd].socket_closed = true;
@@ -347,7 +348,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   }
   logger->log_info("Recieved " + Libft::ft_itos(bytes_recvd) + " bytes on socket " +
                    Libft::ft_itos(fd));
-  logger->log_info(bufg);
+  // logger->log_info(bufg); // cout
   connection.recv_stream << bufg;
   bzero(bufg, sizeof(bufg));
   // connection.recv_stream << buffer;
