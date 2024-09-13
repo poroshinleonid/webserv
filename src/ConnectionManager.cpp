@@ -296,6 +296,7 @@ void ConnectionManager::handle_revent_problem(int fd) {
 // because re don't recv if it is running
 // can I recv() while CGI is running? I think NO.
 bool ConnectionManager::handle_poll_read(int fd) {
+  fds[find_fd_index(fd)].revents = 0;
   // fds[find_fd_index(fd)].revents = static_cast<short>(0);
   // (*logger).log_info("poll() read on socket " + Libft::ft_itos(fd));
   HttpConnection &connection = connections[fd];
@@ -387,6 +388,7 @@ void ConnectionManager::handle_accept(int fd) {
 }
 
 bool ConnectionManager::handle_poll_write(int fd) {
+  fds[find_fd_index(fd)].revents = 0;
   // fds[find_fd_index(fd)].revents = static_cast<short>(0);
   if (conn_timed_out(fd)) {
     close_connection(fd);
