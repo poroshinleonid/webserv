@@ -31,9 +31,10 @@ std::string get_responses_string(HttpConnection &connection) {
   // write(1, "REQ", 3);
   // std::cout << "REQUEST::::" << st << std::endl;
   std::string answ = "HTTP/1.1 200 OK\r\n";
-  // if (st.find("keep-alive")) {
-  if (true) {
+  if (st.find("keep-alive") != string::npos) {
+  // if (true) {
     connection.is_keep_alive = true;
+    std::cout << "KEEP";
     answ += "Connection: keep-alive\r\n";
   }
   answ += "Content-Type: text/plain\r\n"
@@ -324,10 +325,10 @@ bool ConnectionManager::handle_poll_read(int fd) {
   (*logger).log_info("recv on socket " + Libft::ft_itos(fd));
   char bufg[4001];
   int bytes_recvd = recv(fd, bufg, 4000, 0);
-  if (bytes_recvd == 0 && connection.recv_done && !connection.is_keep_alive) {
+  if (bytes_recvd == 0) {
     // close if not keep-alive!
-    // if (connection.is_keep_alive == false) {
-    if (true) {
+    if (connection.is_keep_alive == false) {
+    // if (true) {
       logger->log_info("socket " + Libft::ft_itos(fd) + " hung up gracefully.");
       close_connection(fd);
       return true;
@@ -497,6 +498,7 @@ void ConnectionManager::close_connection(int fd) {
     }
   }
   connections.erase(fd);
+  (*logger).log_info("Closed the connection on socket " + Libft::ft_itos(fd));
 }
 
 bool ConnectionManager::conn_timed_out(int fd) {
