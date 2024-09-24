@@ -11,7 +11,8 @@ class HttpRequest {
   public:
     static const std::array<string, 2> allowedHttpVersions;
     enum class Method {GET, POST, DELETE};
-    HttpRequest(stringstream& stream);
+    HttpRequest();
+    HttpRequest(const string& s);
     HttpRequest(const HttpRequest& other) = default;
     HttpRequest& operator=(const HttpRequest& other) = default;
     ~HttpRequest() = default;

@@ -31,7 +31,10 @@ namespace {
     }
 }
 
-HttpRequest::HttpRequest(stringstream& stream) {
+HttpRequest::HttpRequest(): HttpRequest("") {}
+
+HttpRequest::HttpRequest(const string& s) {
+    std::stringstream stream(s);
     string line;
     getline_str(stream, line, CRLF);
     size_t method_end = line.find(SP);

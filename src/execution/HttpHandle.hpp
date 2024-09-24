@@ -9,8 +9,7 @@ class HttpHandle {
     static std::string compose_response(const std::string& request_str, const Config& config);
   private:
     static std::string status_code_to_respose(int status_code);
-    static void validate_request(const std::string& request_str); // throws -> status code 400
-    static void validate_content_length(const HttpRequest& request); // throw -> status code 413
+    // static void validate_content_length(const HttpRequest& request); // throw -> status code 413
     static Config select_server_config(const HttpRequest& request, const Config& config); // determines server config based on port and host. throws -> 404
     static void is_url_redirection(const HttpRequest& request, const Config& config);
     static void check_if_method_is_allowed(const HttpRequest& request, const Config& config);
@@ -22,6 +21,7 @@ class HttpHandle {
     2. parse URL and cd in the right file
       2.1. check if URL is redirection
       2.2. check if request method is allowed
+      2.2.1. check content length (should be 0 on GET, and < max_content_length on POST)
       2.3. if directory -> directory listing / default file
       2.4. check if the file extension is for cgi
       ^ those might be in a different order ^
