@@ -9,7 +9,9 @@ class HttpRequest {
   using string = std::string;
   using stringstream = std::stringstream;
   public:
+    static const int MAX_BODY_SIZE = 1 * 1000 * 1000;
     static const std::array<string, 2> allowedHttpVersions;
+    static std::vector<std::string> parse_url(const std::string& url);
     enum class Method {GET, POST, DELETE};
     HttpRequest();
     HttpRequest(const string& s);
@@ -17,10 +19,12 @@ class HttpRequest {
     HttpRequest& operator=(const HttpRequest& other) = default;
     ~HttpRequest() = default;
 
-    Method get_method();
-    string get_url();
-    string get_header_at(const string& s);
-    string get_body();
+    Method get_method() const;
+    string get_url() const;
+    string get_header_at(const string& s) const;
+    string get_body() const;
+    std::string get_host() const; // throws if none
+    int get_port() const; // 80 if none, throws if not int / negative
   private:
     Method method_ = Method::GET;
     string url_;

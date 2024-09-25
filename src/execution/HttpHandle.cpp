@@ -1,19 +1,77 @@
 #include "HttpHandle.hpp"
 #include "HttpRequest.hpp"
 
-std::string HttpHandle::compose_response(const std::string& request_str, const Config& config) {
+std::string HttpHandle::compose_response(const std::string& request_str, Config& config) {
     HttpRequest request;
     try {
         request = HttpRequest(request_str);
     } catch (HttpRequest::BadRequest) {
-        return status_code_to_respose(400);
+        return status_code_to_response(400);
+    }
+
+    if (request.get_body().size() > HttpRequest::MAX_BODY_SIZE) {
+        return status_code_to_response(413);
+    }
+
+    try {
+        request.get_host();
+        request.get_port();
+    } catch (std::exception) {
+        return status_code_to_response(400);
     }
 
     Config server_config;
     try {
         server_config = select_server_config(request, config);
     } catch (std::exception) {
-        return status_code_to_respose(413);
+        return status_code_to_response(413);
     }
-    
+
+    std::string url = request.get_url();
+    Config url_config;
+    try {
+        url_config = select_url_config(url, server_config);        
+    } catch (std::exception) {
+        return status_code_to_response(404);
+    }
+}
+
+std::string HttpHandle::status_code_to_response(int status_code) {
+    // TODO
+    return "Oh no!" + std::to_string(status_code);
+}
+
+Config HttpHandle::select_server_config(const HttpRequest& request, Config& config) {
+    vector<Config> servers = config.get_vec("server");
+    std::string request_host = request.get_host();
+    int request_port = request.get_port();
+    for (Config& server_config : servers) {
+        int server_port;
+        std::string server_host;
+        try {
+            std::string port_str = server_config["listen"].unwrap();
+            server_port = std::stoi(port_str);
+        } catch (std::invalid_argument) {
+            continue;
+        } catch (std::out_of_range) {
+            server_port = 80; // default HTTP port
+        }
+
+        try {
+            server_host = server_config["host"].unwrap();
+        } catch (std::out_of_range) {
+            continue;
+        } catch (std::invalid_argument) {
+            continue;
+        }
+
+        if (server_port == request_port && server_host == request_host) {
+            return server_config;
+        }
+    }
+    throw std::runtime_error("Didn't find matching config");
+}
+
+Config HttpHandle::select_url_config(const std::string& url, Config& server_config) {
+    // iterate over urls, find url that is suburl of request url and the longest one among those
 }

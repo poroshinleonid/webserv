@@ -69,26 +69,49 @@ HttpRequest::HttpRequest(const string& s) {
     body_ = body;
 }
 
-HttpRequest::Method HttpRequest::get_method() {
+HttpRequest::Method HttpRequest::get_method() const {
     return method_;
 }
 
-string HttpRequest::get_url() {
+string HttpRequest::get_url() const {
     return url_;
 }
 
-string HttpRequest::get_body() {
+string HttpRequest::get_body() const {
     return body_;
 }
 
-string HttpRequest::get_header_at(const string& s) {
-    return headers_.at(s);
+string HttpRequest::get_host() const {
+    string host_full = get_header_at("Host");
+    std::vector<string> host_split = split_one(host_full, ':');
+    return host_split.at(0);
 }
 
-// bad request exception //
+int HttpRequest::get_port() const {
+    string host_full = get_header_at("Host");
+    std::vector<string> host_split = split_one(host_full, ':');
+    if (host_split.size() < 2) {
+        return 80;
+    }
+    string host_str = host_split[1];
+    int port = std::stoi(host_str);
+    if (port < 0) {
+        throw std::invalid_argument("port can't be negative");
+    }
+    return port;
+}
+
+string HttpRequest::get_header_at(const string& s) const {
+    return headers_.at(s);
+}
 
 HttpRequest::BadRequest::BadRequest(char const* const message) throw(): std::runtime_error(message) {}
 
 char const* HttpRequest::BadRequest::what() const throw() {
     return std::runtime_error::what();
+}
+
+std::vector<std::string> HttpRequest::parse_url(const std::string& url) {
+    return split(url, '/');
+    // TODO: port
 }
