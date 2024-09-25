@@ -22,3 +22,17 @@ std::vector<std::string> split(const std::string& str, char del);
 
 // splits only one time (or doesn't split if delimiter is not found)
 std::vector<std::string> split_one(const std::string& str, char del);
+
+// returns true if first is prefix is prefix of vec
+template <typename T>
+bool is_vector_prefix(const std::vector<T>& prefix, const std::vector<T>& vec) {
+    if (prefix.size() > vec.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < prefix.size(); i++) {
+        if (prefix[i] != vec[i]) {
+            return false;
+        }
+    }
+    return true;
+}

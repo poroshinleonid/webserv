@@ -31,7 +31,7 @@ namespace {
     }
 }
 
-HttpRequest::HttpRequest(): HttpRequest("") {}
+HttpRequest::HttpRequest(): HttpRequest("GET / HTTP/1.1\n") {}
 
 HttpRequest::HttpRequest(const string& s) {
     std::stringstream stream(s);
@@ -112,6 +112,10 @@ char const* HttpRequest::BadRequest::what() const throw() {
 }
 
 std::vector<std::string> HttpRequest::parse_url(const std::string& url) {
-    return split(url, '/');
-    // TODO: port
+    std::vector<std::string> parsed_url = split(url, '/');
+    if (url.size() != 0 && url[0] == '/') {
+        parsed_url.erase(parsed_url.begin());
+    }
+    return parsed_url;
+    // TODO: port (or not)
 }

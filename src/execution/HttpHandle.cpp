@@ -1,8 +1,11 @@
 #include "HttpHandle.hpp"
 #include "HttpRequest.hpp"
+#include "Base.hpp"
 
+#include <iostream>
 std::string HttpHandle::compose_response(const std::string& request_str, Config& config) {
     HttpRequest request;
+
     try {
         request = HttpRequest(request_str);
     } catch (HttpRequest::BadRequest) {
@@ -24,7 +27,7 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
     try {
         server_config = select_server_config(request, config);
     } catch (std::exception) {
-        return status_code_to_response(413);
+        return status_code_to_response(404);
     }
 
     std::string url = request.get_url();
@@ -34,6 +37,8 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
     } catch (std::exception) {
         return status_code_to_response(404);
     }
+
+    return "all good";
 }
 
 std::string HttpHandle::status_code_to_response(int status_code) {
@@ -74,4 +79,29 @@ Config HttpHandle::select_server_config(const HttpRequest& request, Config& conf
 
 Config HttpHandle::select_url_config(const std::string& url, Config& server_config) {
     // iterate over urls, find url that is suburl of request url and the longest one among those
+    std::vector<std::string> parsed_request_url = HttpRequest::parse_url(url);
+    vector<Config> locations = server_config.get_vec("location");
+    int max_prefix_size = -1;
+    Config selected;
+    for (Config& url_config : locations) {
+        std::string location_url;
+        try {
+            location_url = url_config["url"].unwrap();
+        } catch (std::exception) {
+            continue;
+        }
+        vector<std::string> parsed_location_url = HttpRequest::parse_url(location_url);
+        if (is_vector_prefix(parsed_location_url, parsed_request_url) == false) {
+            continue;
+        }
+        if (static_cast<long long>(parsed_location_url.size()) > static_cast<long long>(max_prefix_size)) {
+            selected = url_config;
+            max_prefix_size = parsed_location_url.size();
+            continue;
+        }
+    }
+    if (max_prefix_size == -1) {
+        throw std::runtime_error("Couldn't find matching location");
+    }
+    return selected;
 }
