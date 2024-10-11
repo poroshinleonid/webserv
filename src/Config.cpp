@@ -174,7 +174,7 @@ string Config::eat_value(const string& s) {
 }
 
 bool Config::key_exists(const std::string &key) {
-  return get_vec(key).empty();
+  return !get_vec(key).empty();
 }
 
 std::map<string, string> Config::get_content_dict() {

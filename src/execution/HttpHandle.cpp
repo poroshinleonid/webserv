@@ -2,7 +2,6 @@
 #include "HttpRequest.hpp"
 #include "Base.hpp"
 
-#include <iostream>
 std::string HttpHandle::compose_response(const std::string& request_str, Config& config) {
     HttpRequest request;
 
@@ -38,12 +37,20 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
         return status_code_to_response(404);
     }
 
-    return "all good";
+    if (url_config.key_exists("redirect")) {
+        return redirection_response(url_config["redirect"].unwrap());
+    }
+
+    return "all ok";
 }
 
 std::string HttpHandle::status_code_to_response(int status_code) {
     // TODO
     return "Oh no!" + std::to_string(status_code);
+}
+
+std::string HttpHandle::redirection_response(const std::string& redirection_url) {
+    return "HTTP/1.1 301 Moved Permanently\n" "location: " + redirection_url  + "\n";
 }
 
 Config HttpHandle::select_server_config(const HttpRequest& request, Config& config) {

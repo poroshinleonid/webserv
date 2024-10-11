@@ -8,12 +8,13 @@ class HttpHandle {
     HttpHandle() = delete;
     static std::string compose_response(const std::string& request_str, Config& config);
   private:
-    static std::string status_code_to_response(int status_code);
     static Config select_server_config(const HttpRequest& request, Config& config); // determines server config based on port and host. throws -> 404
     static Config select_url_config(const std::string& url, Config& server_config); // selects config matching the url. throws -> 404
     static void is_url_redirection(const HttpRequest& request, Config& config);
     static void check_if_method_is_allowed(const HttpRequest& request, Config& config);
 
+    static std::string status_code_to_response(int status_code);
+    static std::string redirection_response(const std::string& redirection_url);
     // static void 
     /*
     0. parse http and make sure its valid, status code 400 if not (maybe accept std::string as request for that purpose)
