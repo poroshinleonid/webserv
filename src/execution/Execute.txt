@@ -1,0 +1,7 @@
+// std::string get_responses_string(HttpConnection &connection) - implement
+  // std::stringstream recv_stream; -> string and parse as the whole request
+  // bool is_cgi_running = true - if starting
+  // pid_t cgi_pid;
+  // int cgi_pipe[2]; - where cgi puts response
+  // todo: read 
+
