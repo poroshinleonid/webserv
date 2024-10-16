@@ -133,9 +133,11 @@ std::vector<std::string> HttpRequest::parse_url(const std::string& url) {
 
 std::string HttpRequest::join_url(const std::vector<std::string>& parsed_url) {
     std::string result;
-    for (const std::string& s : parsed_url) {
-        result += s;
-        result += "/";
+    for (auto it = parsed_url.begin(); it < parsed_url.end(); it++) {
+        result += *it;
+        if (it + 1 != parsed_url.end()) {
+            result += "/";
+        }
     }
     return result;
 }

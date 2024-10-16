@@ -3,6 +3,9 @@
 #include "Base.hpp"
 
 #include <algorithm>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 std::string HttpHandle::compose_response(const std::string& request_str, Config& config) {
     HttpRequest request;
@@ -76,8 +79,42 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
     }
 
     std::string object_path = HttpHandle::compose_object_path(url, server_url, root);
-    debug(object_path);
-    return "all ok";
+    if (object_path.find("~") != std::string::npos) {
+        object_path.replace(object_path.find("~"), 1, std::getenv("HOME")); // TODO: won't work if ~ is somewhere in the middle but idc
+    }
+    
+    bool is_directory_listing = false;
+    try {
+        if (server_config["directory_listing"].unwrap() == "ON") {
+            is_directory_listing = true;
+        }
+    } catch (std::exception) {
+        is_directory_listing = false;
+    }
+
+    fs::path path(object_path);
+    if (!fs::exists(path)) {
+        return status_code_to_response(404);
+    }
+    if (fs::is_directory(path)) {
+        if (is_directory_listing) {
+            return directory_listing_response(object_path);
+        }
+        else {
+            return no_directory_listing_response(object_path);
+        }
+    }
+
+    const std::string cgi_extension = ".py";
+    if (!fs::is_regular_file(path)) {
+        std::cerr << "Error: " + object_path + " is not a dir or regular file\n";
+        return status_code_to_response(500); // TODO: idk if 500
+    }
+
+    if (path.extension() == cgi_extension) {
+        return execute_cgi_response(object_path);
+    }
+    return "all good";
 }
 
 std::string HttpHandle::status_code_to_response(int status_code) {
@@ -87,6 +124,23 @@ std::string HttpHandle::status_code_to_response(int status_code) {
 
 std::string HttpHandle::redirection_response(const std::string& redirection_url) {
     return "HTTP/1.1 301 Moved Permanently\n" "location: " + redirection_url  + "\n";
+}
+
+std::string HttpHandle::directory_listing_response(const std::string& directory_path) {
+    // TODO
+    // might want to pass filesystem::path instead of string
+    return "Directory listing for: " + directory_path;
+}
+
+std::string HttpHandle::no_directory_listing_response(const std::string& directory_path) {
+    // TODO
+    // might want to pass filesystem::path instead of string
+    return "Index of directory for: " + directory_path;
+}
+
+std::string HttpHandle::execute_cgi_response(const std::string& script_path) {
+    // TODO
+    return "Executing cgi for: " + script_path;
 }
 
 Config HttpHandle::select_server_config(const HttpRequest& request, Config& config) {
