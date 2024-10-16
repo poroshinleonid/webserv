@@ -59,6 +59,24 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
         return status_code_to_response(405);
     }
 
+    std::string root; // TODO (or not): add default_root thingy
+    try {
+        root = url_config["root"].unwrap();
+    } catch (std::exception) {
+        std::cerr << "config error: no root\n";
+        return status_code_to_response(500);
+    }
+
+    std::string server_url;
+    try {
+        server_url = url_config["url"].unwrap();
+    } catch (...) {
+        std::cerr << "how did we get here\n";
+        exit(1);
+    }
+
+    std::string object_path = HttpHandle::compose_object_path(url, server_url, root);
+    debug(object_path);
     return "all ok";
 }
 
@@ -130,4 +148,19 @@ Config HttpHandle::select_url_config(const std::string& url, Config& server_conf
         throw std::runtime_error("Couldn't find matching location");
     }
     return selected;
+}
+
+std::string HttpHandle::compose_object_path(const std::string& url, const std::string& server_url, const std::string& root) {
+    // replaces server_url to root in url
+    std::vector<std::string> parsed_request_url = HttpRequest::parse_url(url);
+    std::vector<std::string> parsed_server_url = HttpRequest::parse_url(server_url);
+    std::vector<std::string> parsed_root = HttpRequest::parse_url(root);
+    std::vector<std::string> result_path;
+    result_path.insert(result_path.end(), parsed_root.begin(), parsed_root.end());
+    result_path.insert(result_path.end(), parsed_request_url.begin() + parsed_server_url.size(), parsed_request_url.end());
+    std::string joined_result = HttpRequest::join_url(result_path);
+    if (trim(root)[0] == '/') {
+        joined_result = "/" + joined_result;
+    }
+    return joined_result;
 }

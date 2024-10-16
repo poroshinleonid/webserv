@@ -130,3 +130,12 @@ std::vector<std::string> HttpRequest::parse_url(const std::string& url) {
     return parsed_url;
     // TODO: port (or not)
 }
+
+std::string HttpRequest::join_url(const std::vector<std::string>& parsed_url) {
+    std::string result;
+    for (const std::string& s : parsed_url) {
+        result += s;
+        result += "/";
+    }
+    return result;
+}

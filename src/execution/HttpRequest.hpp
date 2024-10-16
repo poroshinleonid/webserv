@@ -12,6 +12,7 @@ class HttpRequest {
     static const int MAX_BODY_SIZE = 1 * 1000 * 1000;
     static const std::array<string, 2> allowedHttpVersions;
     static std::vector<std::string> parse_url(const std::string& url);
+    static std::string join_url(const std::vector<std::string>& parsed_url);
     enum class Method {GET, POST, DELETE};
     HttpRequest();
     HttpRequest(const string& s);
