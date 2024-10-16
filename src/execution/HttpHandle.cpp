@@ -2,6 +2,8 @@
 #include "HttpRequest.hpp"
 #include "Base.hpp"
 
+#include <algorithm>
+
 std::string HttpHandle::compose_response(const std::string& request_str, Config& config) {
     HttpRequest request;
 
@@ -39,6 +41,22 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
 
     if (url_config.key_exists("redirect")) {
         return redirection_response(url_config["redirect"].unwrap());
+    }
+
+    std::vector<std::string> allowed_methods;
+    {
+        std::vector<Config> allowed_methods_cfg = url_config.get_vec("allow");
+        for (Config& method_cfg : allowed_methods_cfg) {
+            try {
+                allowed_methods.push_back(method_cfg.unwrap());
+            } catch (std::invalid_argument) {
+                // ignore
+            }
+        }
+    }
+    std::string req_method = HttpRequest::method_to_str(request.get_method());
+    if (std::all_of(allowed_methods.begin(), allowed_methods.end(), [&req_method](const std::string& method){return method != req_method;})) {
+        return status_code_to_response(405);
     }
 
     return "all ok";
@@ -81,6 +99,7 @@ Config HttpHandle::select_server_config(const HttpRequest& request, Config& conf
             return server_config;
         }
     }
+
     throw std::runtime_error("Didn't find matching config");
 }
 

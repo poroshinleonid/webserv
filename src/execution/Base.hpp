@@ -4,6 +4,7 @@
 #include <sstream>
 #include <vector>
 #include <array>
+#include <iostream>
 
 // trim from start
 std::string ltrim(const std::string &s);
@@ -35,4 +36,12 @@ bool is_vector_prefix(const std::vector<T>& prefix, const std::vector<T>& vec) {
         }
     }
     return true;
+}
+
+
+// parody on rust's "debug!"
+template <typename T>
+T debug(T thingy) {
+    std::cerr << "debug: " << thingy << '\n';
+    return thingy;
 }

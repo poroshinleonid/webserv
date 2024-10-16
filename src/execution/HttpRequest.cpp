@@ -73,6 +73,17 @@ HttpRequest::Method HttpRequest::get_method() const {
     return method_;
 }
 
+std::string HttpRequest::method_to_str(const Method& method) {
+    switch (method) {
+        case Method::GET:
+            return "GET";
+        case Method::POST:
+            return "POST";
+        case Method::DELETE:
+            return "DELETE";
+    }
+}
+
 string HttpRequest::get_url() const {
     return url_;
 }

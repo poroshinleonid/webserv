@@ -20,6 +20,7 @@ class HttpRequest {
     ~HttpRequest() = default;
 
     Method get_method() const;
+    static std::string method_to_str(const Method& method);
     string get_url() const;
     string get_header_at(const string& s) const;
     string get_body() const;
