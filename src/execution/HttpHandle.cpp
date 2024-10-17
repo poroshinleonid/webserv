@@ -14,25 +14,25 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
     try {
         request = HttpRequest(request_str);
     } catch (HttpRequest::BadRequest) {
-        return status_code_to_response(400);
+        return status_code_to_response(400, config /*dummy*/);
     }
 
     if (request.get_body().size() > HttpRequest::MAX_BODY_SIZE) {
-        return status_code_to_response(413);
+        return status_code_to_response(413, config /*dummy*/);
     }
 
     try {
         request.get_host();
         request.get_port();
     } catch (std::exception) {
-        return status_code_to_response(400);
+        return status_code_to_response(400, config /*dummy*/);
     }
 
     Config server_config;
     try {
         server_config = select_server_config(request, config);
     } catch (std::exception) {
-        return status_code_to_response(404);
+        return status_code_to_response(404, config /*dummy*/);
     }
 
     std::string url = request.get_url();
@@ -40,7 +40,7 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
     try {
         url_config = select_url_config(url, server_config);        
     } catch (std::exception) {
-        return status_code_to_response(404);
+        return status_code_to_response(404, server_config);
     }
 
     if (url_config.key_exists("redirect")) {
@@ -60,7 +60,7 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
     }
     std::string req_method = HttpRequest::method_to_str(request.get_method());
     if (std::all_of(allowed_methods.begin(), allowed_methods.end(), [&req_method](const std::string& method){return method != req_method;})) {
-        return status_code_to_response(405);
+        return status_code_to_response(405, server_config);
     }
 
     std::string root; // TODO (or not): add default_root thingy
@@ -68,7 +68,7 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
         root = url_config["root"].unwrap();
     } catch (std::exception) {
         std::cerr << "config error: no root\n";
-        return status_code_to_response(500);
+        return status_code_to_response(500, server_config);
     }
 
     std::string server_url;
@@ -80,9 +80,6 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
     }
 
     std::string object_path = HttpHandle::compose_object_path(url, server_url, root);
-    if (object_path.find("~") != std::string::npos) {
-        object_path.replace(object_path.find("~"), 1, std::getenv("HOME")); // TODO: won't work if ~ is somewhere in the middle but idc [maybe even remove the whole ~ thing]
-    }
     
     bool is_directory_listing = false;
     try {
@@ -95,7 +92,7 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
 
     fs::path path(object_path);
     if (!fs::exists(path)) {
-        return status_code_to_response(404);
+        return status_code_to_response(404, server_config);
     }
     if (fs::is_directory(path)) {
         if (is_directory_listing) {
@@ -108,12 +105,12 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
 
     if (!fs::is_regular_file(path)) {
         std::cerr << "Error: " + object_path + " is not dir or regular file\n";
-        return status_code_to_response(500); // TODO: idk if 500
+        return status_code_to_response(500, server_config); // TODO: idk if 500
     }
     std::ifstream file(object_path);
     if (!file.good()) {
         std::cerr << "Error: couldn't read " << object_path << "\n";
-        return status_code_to_response(500);
+        return status_code_to_response(500, server_config);
     }
 
     const std::string cgi_extension = ".py";
@@ -139,12 +136,7 @@ std::string HttpHandle::file_response(std::ifstream&& file, const std::string& e
 
     content_type = "Content-Type: " + content_type + "\n";
 
-    return header + content_type + content;
-}
-
-std::string HttpHandle::status_code_to_response(int status_code) {
-    // TODO
-    return "Oh no!" + std::to_string(status_code);
+    return header + content_type + "\n" + content;
 }
 
 std::string HttpHandle::redirection_response(const std::string& redirection_url) {
@@ -242,4 +234,88 @@ std::string HttpHandle::compose_object_path(const std::string& url, const std::s
         joined_result = "/" + joined_result;
     }
     return joined_result;
+}
+
+std::string HttpHandle::status_code_to_response(int status_code, Config& server_config) {
+    const std::unordered_map<int, std::string> httpStatusCodes = {
+        // 4xx Client Errors
+        {400, "Bad Request"},
+        {401, "Unauthorized"},
+        {403, "Forbidden"},
+        {404, "Not Found"},
+        {405, "Method Not Allowed"},
+        {406, "Not Acceptable"},
+        {407, "Proxy Authentication Required"},
+        {408, "Request Timeout"},
+        {409, "Conflict"},
+        {410, "Gone"},
+        {411, "Length Required"},
+        {413, "Payload Too Large"},
+        {414, "URI Too Long"},
+        {415, "Unsupported Media Type"},
+        {416, "Range Not Satisfiable"},
+        {417, "Expectation Failed"},
+        {418, "I'm a teapot"},
+        {421, "Misdirected Request"},
+        {422, "Unprocessable Entity"},
+        {423, "Locked"},
+        {424, "Failed Dependency"},
+        {425, "Too Early"},
+        {426, "Upgrade Required"},
+        {428, "Precondition Required"},
+        {429, "Too Many Requests"},
+        {431, "Request Header Fields Too Large"},
+        {451, "Unavailable For Legal Reasons"},
+
+        // 5xx Server Errors
+        {500, "Internal Server Error"},
+        {501, "Not Implemented"},
+        {502, "Bad Gateway"},
+        {503, "Service Unavailable"},
+        {504, "Gateway Timeout"},
+        {505, "HTTP Version Not Supported"},
+        {506, "Variant Also Negotiates"},
+        {507, "Insufficient Storage"},
+        {508, "Loop Detected"},
+        {510, "Not Extended"},
+        {511, "Network Authentication Required"}
+    };
+
+    std::string error_name;
+    auto error_it = httpStatusCodes.find(status_code);
+    if (error_it == httpStatusCodes.end()) {
+        error_name = "Unrecognized error";
+    } else {
+        error_name = error_it->second;
+    }
+    std::string error_message = std::to_string(status_code) + " " + error_name;
+    
+    std::string error_content = R"(<!DOCTYPE html>
+<html>
+  <head>
+    <title>Error</title>
+  </head>
+  <body>
+    <h1>An error occurred.</h1>
+    <p>$ERROR$</p>
+  </body>
+</html>)"; // default
+    try {
+        const std::string error_file_path = server_config["errors"].unwrap();
+        std::ifstream file(error_file_path);
+        if (!file.good()) {throw std::exception();};
+        std::stringstream buffer;
+        buffer << file.rdbuf();
+        error_content = buffer.str();
+    } catch (std::exception) {
+        // keep default content
+    }
+    const std::string ERROR_MARKER = "$ERROR$";
+    error_content.replace(error_content.find(ERROR_MARKER), ERROR_MARKER.size(), error_message);
+
+    return "HTTP/1.1 "
+    + error_message + "\n"
+    "Content-type: text/html\n"
+    "\n"
+    + error_content;
 }
