@@ -5,10 +5,13 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <thread>
+#include <future>
+#include <unistd.h>
 
 namespace fs = std::filesystem;
 
-std::string HttpHandle::compose_response(const std::string& request_str, Config& config) {
+response HttpHandle::compose_response(const std::string& request_str, Config& config) {
     HttpRequest request;
 
     try {
@@ -155,9 +158,34 @@ std::string HttpHandle::no_directory_listing_response(const std::string& directo
     return "Index of directory for: " + directory_path;
 }
 
-std::string HttpHandle::execute_cgi_response(const std::string& script_path) {
-    // TODO
-    return "Executing cgi for: " + script_path;
+static void run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path) {
+    const std::string response_prefix = R"(HTTP/1.1 200 OK
+Content-type: text/plain
+
+
+)";
+    const std::string command = "python3 " + script_path + " 2>&1";
+    FILE* file = popen(command.c_str(), "r"); // TODO: idk if allowed
+    if (!file) {
+        std::cerr << "Error executing cgi: " << script_path << '\n';
+        cgi_promise.set_value(response_prefix + "Cgi failed to execute");
+        return;
+    }
+
+    std::string result;
+    char buffer[128];
+    while (fgets(buffer, sizeof(buffer), file) != nullptr) {
+        result += buffer;
+    }
+    cgi_promise.set_value(response_prefix + result);
+}
+
+std::future<std::string> HttpHandle::execute_cgi_response(const std::string& script_path) {
+    std::promise<std::string> cgi_promise;
+    std::future<std::string> cgi_future = cgi_promise.get_future();
+    std::thread t(run_cgi, std::move(cgi_promise), script_path);
+    t.detach();
+    return cgi_future;
 }
 
 Config HttpHandle::select_server_config(const HttpRequest& request, Config& config) {

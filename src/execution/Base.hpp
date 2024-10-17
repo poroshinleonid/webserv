@@ -5,6 +5,8 @@
 #include <vector>
 #include <array>
 #include <iostream>
+#include <future>
+#include <chrono>
 
 // trim from start
 std::string ltrim(const std::string &s);
@@ -44,4 +46,10 @@ template <typename T>
 T dbg(T thingy) {
     std::cerr << "debug: " << thingy << '\n';
     return thingy;
+}
+
+// checks if future is ready
+template<typename R>
+bool future_is_ready(std::future<R> const& f) { 
+    return f.wait_for(std::chrono::seconds(0)) == std::future_status::ready; 
 }
