@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <fstream>
 
 namespace fs = std::filesystem;
 
@@ -80,7 +81,7 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
 
     std::string object_path = HttpHandle::compose_object_path(url, server_url, root);
     if (object_path.find("~") != std::string::npos) {
-        object_path.replace(object_path.find("~"), 1, std::getenv("HOME")); // TODO: won't work if ~ is somewhere in the middle but idc
+        object_path.replace(object_path.find("~"), 1, std::getenv("HOME")); // TODO: won't work if ~ is somewhere in the middle but idc [maybe even remove the whole ~ thing]
     }
     
     bool is_directory_listing = false;
@@ -105,16 +106,40 @@ std::string HttpHandle::compose_response(const std::string& request_str, Config&
         }
     }
 
-    const std::string cgi_extension = ".py";
     if (!fs::is_regular_file(path)) {
-        std::cerr << "Error: " + object_path + " is not a dir or regular file\n";
+        std::cerr << "Error: " + object_path + " is not dir or regular file\n";
         return status_code_to_response(500); // TODO: idk if 500
     }
+    std::ifstream file(object_path);
+    if (!file.good()) {
+        std::cerr << "Error: couldn't read " << object_path << "\n";
+        return status_code_to_response(500);
+    }
 
+    const std::string cgi_extension = ".py";
     if (path.extension() == cgi_extension) {
         return execute_cgi_response(object_path);
     }
-    return "all good";
+    return file_response(std::move(file), path.extension());
+}
+
+std::string HttpHandle::file_response(std::ifstream&& file, const std::string& extension) {
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+
+    std::string content = buffer.str();
+
+    const std::string header = "HTTP/1.1 200 OK\n";
+    std::string content_type = "text/plain";
+    if (extension == ".html") {
+        content_type = "text/html";
+    } else if (extension == ".css") {
+        content_type = "text/css";
+    }
+
+    content_type = "Content-Type: " + content_type + "\n";
+
+    return header + content_type + content;
 }
 
 std::string HttpHandle::status_code_to_response(int status_code) {

@@ -3,6 +3,8 @@
 #include "HttpRequest.hpp"
 #include "Config.hpp"
 
+#include <fstream>
+
 class HttpHandle {
   public:
     HttpHandle() = delete;
@@ -11,12 +13,13 @@ class HttpHandle {
     static Config select_server_config(const HttpRequest& request, Config& config); // determines server config based on port and host. throws -> 404
     static Config select_url_config(const std::string& url, Config& server_config); // selects config matching the url. throws -> 404
 
+    static std::string file_response(std::ifstream&& file, const std::string& extension);
     static std::string status_code_to_response(int status_code);
     static std::string redirection_response(const std::string& redirection_url);
     static std::string directory_listing_response(const std::string& directory_path);
     static std::string no_directory_listing_response(const std::string& directory_path);
     static std::string compose_object_path(const std::string& url, const std::string& server_url, const std::string& root);
-    static std::string execute_cgi_response(const std::string& script_path);
+    static std::string execute_cgi_response(const std::string& scipt_path);
     // static void 
     /*
     0. parse http and make sure its valid, status code 400 if not (maybe accept std::string as request for that purpose)

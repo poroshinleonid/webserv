@@ -39,9 +39,9 @@ bool is_vector_prefix(const std::vector<T>& prefix, const std::vector<T>& vec) {
 }
 
 
-// parody on rust's "debug!"
+// parody on rust's dbg! macro
 template <typename T>
-T debug(T thingy) {
+T dbg(T thingy) {
     std::cerr << "debug: " << thingy << '\n';
     return thingy;
 }
