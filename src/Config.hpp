@@ -103,6 +103,7 @@ public:
 
 private:
   Config(const std::string &content, bool /* dummy */);
+  Config();
   static string remove_spaces(const string &s);
   void throw_if_invalid();
   void get_value(const std::string &s);

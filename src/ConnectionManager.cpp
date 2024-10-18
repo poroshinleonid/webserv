@@ -30,37 +30,16 @@ std::string get_responses_string(HttpConnection &connection) {
   connection.recv_stream.clear();
   std::string answ = "HTTP/1.1 200 OK\r\n";
   if (st.find("keep-alive") != string::npos) {
-  // if (true) {
     connection.is_keep_alive = true;
-    std::cout << "KEEP";
     answ += "Connection: keep-alive\r\n";
   }
   answ += "Content-Type: text/plain\r\n"
           "Content-Length: 12\r\n";
   answ += "\r\n"
          "Hello world!";
-  // std::cout << connection.recv_stream.str();
   connection.recv_done = true;
-  // std::cout << answ;
   return answ;
 }
-
-// std::string get_responses_string(HttpConnection &connection) {
-//   std::string st = connection.recv_stream.str();
-//   // if (st.find("keep-alive")) {
-//   if (true) {
-//     connection.is_keep_alive = true;
-//   }
-//   std::cout << "Request:\t" << st << std::endl;
-//   (void)connection;
-//   std::string resp = "HTTP/1.1 200 OK\r\n"
-//          "Content-Type: text/plain\r\n"
-//          "Content-Length: 12\r\n"
-//          "\r\n"
-//          "Hello, world!" + 
-//          st;
-//   return resp;
-// }
 
 ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
     : config(cfg), logger(log) {
@@ -88,12 +67,6 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 
     // 2. Setup the server_names or not.
     // 3. The first server for a host:port will be the default for this
-    // host:port (that means it will answer to all the requests that don’t
-    // belong to an other server). std::istringstream
-    // iss(cfg["server_name"].unwrap()); std::string srv_name; while (iss >>
-    // srv_name) {
-    //   serv.server_names.push_back(srv_name);
-    // }
     serv.server_names = Config::split_string(cfg.get_value_safely("server_name"));
 
     // 4. Setup default error pages.
@@ -323,9 +296,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   char bufg[4001];
   int bytes_recvd = recv(fd, bufg, 4000, 0);
   if (bytes_recvd == 0) {
-    // close if not keep-alive!
     if (connection.is_keep_alive == false) {
-    // if (true) {
       logger->log_info("socket " + Libft::ft_itos(fd) + " hung up gracefully.");
       close_connection(fd);
       return true;
@@ -342,7 +313,6 @@ bool ConnectionManager::handle_poll_read(int fd) {
   if (bytes_recvd < 4000) {
     connection.recv_done = true;
     fds[find_fd_index(fd)].events |= POLLOUT;
-    // fds[find_fd_index(fd)].events
   }
   logger->log_info("Recieved " + Libft::ft_itos(bytes_recvd) + " bytes on socket " +
                    Libft::ft_itos(fd));
