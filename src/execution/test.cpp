@@ -5,7 +5,7 @@
 
 int main()
 {
-    std::string request = "POST /other_folder/a.html HTTP/1.1\r\nHost: not_the_best_host:8081\r\n";
+    std::string request = "POST /other_folder/b.py HTTP/1.1\r\nHost: not_the_best_host:8081\r\n";
     Config cfg("Config.cfg");
     auto resp = HttpHandle::compose_response(request, cfg);
     std::cout << std::get<std::string>(resp);

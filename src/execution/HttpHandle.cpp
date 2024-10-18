@@ -102,7 +102,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
             return directory_listing_response(object_path);
         }
         else {
-            return no_directory_listing_response(object_path);
+            return no_directory_listing_response(path, url_config);
         }
     }
 
@@ -120,7 +120,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     if (path.extension() == cgi_extension) {
         return execute_cgi_response(object_path);
     }
-    return file_response(std::move(file), path.extension());
+    return file_response(object_path, server_config);
 }
 
 std::string HttpHandle::ok_response_head(ContentType t) {
@@ -141,13 +141,19 @@ std::string HttpHandle::ok_response_head(ContentType t) {
     return response_head;
 }
 
-std::string HttpHandle::file_response(std::ifstream&& file, const std::string& extension) {
+std::string HttpHandle::file_response(const std::string& file_path, Config& server_config) {
+    std::ifstream file(file_path);
+    if (!file.good()) {
+        std::cerr << "Error: couldn't read " << file_path << "\n";
+        return status_code_to_response(500, server_config);
+    }
     std::stringstream buffer;
     buffer << file.rdbuf();
 
     std::string content = buffer.str();
 
     ContentType content_type;
+    std::string extension = fs::path(file_path).extension();
     if (extension == ".html") {
         content_type = ContentType::html;
     } else if (extension == ".css") {
@@ -169,9 +175,15 @@ std::string HttpHandle::directory_listing_response(const std::string& directory_
     return "Directory listing for: " + directory_path;
 }
 
-std::string HttpHandle::no_directory_listing_response(const std::string& directory_path) {
-    // no index -> 
-    return "Index of directory for: " + directory_path;
+std::string HttpHandle::no_directory_listing_response(const fs::path& directory_path, Config& url_config) {
+    fs::path index = "index.html";
+    try {
+        index = url_config["index"].unwrap();
+    } catch (...) {
+        // ignore
+    }
+    index = directory_path/index;
+    // return "Index of directory for: " + directory_path;
 }
 
 void HttpHandle::run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path) {

@@ -6,6 +6,7 @@
 #include <fstream>
 #include <variant>
 #include <future>
+#include <filesystem>
 
 using response = std::variant<std::string, std::future<std::string>>;
 
@@ -23,10 +24,10 @@ class HttpHandle {
       css,
     };
     static std::string ok_response_head(ContentType t);
-    static std::string file_response(std::ifstream&& file, const std::string& extension);
+    static std::string file_response(const std::string& file_path, Config& server_config);
     static std::string redirection_response(const std::string& redirection_url);
     static std::string directory_listing_response(const std::string& directory_path);
-    static std::string no_directory_listing_response(const std::string& directory_path);
+    static std::string no_directory_listing_response(const std::filesystem::path& directory_path, Config& url_config);
     static std::string compose_object_path(const std::string& url, const std::string& server_url, const std::string& root);
     static std::future<std::string> execute_cgi_response(const std::string& scipt_path);
     static void run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path);
