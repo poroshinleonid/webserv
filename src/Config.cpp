@@ -25,6 +25,9 @@ Config::Config(const std::string &filename) : depth_(0) {
   throw_if_invalid();
 }
 
+Config::Config(): Config("{}", true) {
+}
+
 Config Config::operator[](const std::string &key) {
   try {
     get_value(key);
@@ -122,6 +125,9 @@ string Config::eat_obj(const string &s) {
 }
 
 void Config::search_linklist(string s) {
+    if (s.empty()) {
+        return;
+    }
   depth_++;
   while (!s.empty()) {
     s = eat_link(s);

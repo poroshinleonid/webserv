@@ -36,3 +36,30 @@ std::istream& getline_str(std::istream& istream, std::string& s, const std::stri
     }
     return istream;
 }
+
+std::vector<std::string> split(const std::string& str, char del) {
+    std::vector<std::string> res;
+    std::string s = str;
+    while (!s.empty()) {
+        size_t pos = s.find(del);
+        if (pos == std::string::npos) {
+            res.push_back(std::move(s));
+        } else {
+            res.push_back(s.substr(0, pos));
+            s = s.substr(pos + 1);
+        }
+    }
+    return res;
+}
+
+std::vector<std::string> split_one(const std::string& str, char del) {
+    std::vector<std::string> res;
+    size_t pos = str.find(del);
+    if (pos == std::string::npos) {
+        res.push_back(str);
+        return res;
+    }
+    res.push_back(str.substr(0, pos));
+    res.push_back(str.substr(pos + 1));
+    return res;
+}

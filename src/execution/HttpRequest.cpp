@@ -1,4 +1,4 @@
-#include "HttpParse.hpp"
+#include "HttpRequest.hpp"
 #include "Base.hpp"
 
 #define CRLF "\r\n"
@@ -31,7 +31,10 @@ namespace {
     }
 }
 
-HttpRequest::HttpRequest(stringstream& stream) {
+HttpRequest::HttpRequest(): HttpRequest("GET / HTTP/1.1\n") {}
+
+HttpRequest::HttpRequest(const string& s) {
+    std::stringstream stream(s);
     string line;
     getline_str(stream, line, CRLF);
     size_t method_end = line.find(SP);
@@ -66,26 +69,75 @@ HttpRequest::HttpRequest(stringstream& stream) {
     body_ = body;
 }
 
-HttpRequest::Method HttpRequest::get_method() {
+HttpRequest::Method HttpRequest::get_method() const {
     return method_;
 }
 
-string HttpRequest::get_url() {
+std::string HttpRequest::method_to_str(const Method& method) {
+    switch (method) {
+        case Method::GET:
+            return "GET";
+        case Method::POST:
+            return "POST";
+        case Method::DELETE:
+            return "DELETE";
+    }
+}
+
+string HttpRequest::get_url() const {
     return url_;
 }
 
-string HttpRequest::get_body() {
+string HttpRequest::get_body() const {
     return body_;
 }
 
-string HttpRequest::get_header_at(const string& s) {
-    return headers_.at(s);
+string HttpRequest::get_host() const {
+    string host_full = get_header_at("Host");
+    std::vector<string> host_split = split_one(host_full, ':');
+    return host_split.at(0);
 }
 
-// bad request exception //
+int HttpRequest::get_port() const {
+    string host_full = get_header_at("Host");
+    std::vector<string> host_split = split_one(host_full, ':');
+    if (host_split.size() < 2) {
+        return 80;
+    }
+    string host_str = host_split[1];
+    int port = std::stoi(host_str);
+    if (port < 0) {
+        throw std::invalid_argument("port can't be negative");
+    }
+    return port;
+}
+
+string HttpRequest::get_header_at(const string& s) const {
+    return headers_.at(s);
+}
 
 HttpRequest::BadRequest::BadRequest(char const* const message) throw(): std::runtime_error(message) {}
 
 char const* HttpRequest::BadRequest::what() const throw() {
     return std::runtime_error::what();
+}
+
+std::vector<std::string> HttpRequest::parse_url(const std::string& url) {
+    std::vector<std::string> parsed_url = split(url, '/');
+    if (url.size() != 0 && url[0] == '/') {
+        parsed_url.erase(parsed_url.begin());
+    }
+    return parsed_url;
+    // TODO: port (or not)
+}
+
+std::string HttpRequest::join_url(const std::vector<std::string>& parsed_url) {
+    std::string result;
+    for (auto it = parsed_url.begin(); it < parsed_url.end(); it++) {
+        result += *it;
+        if (it + 1 != parsed_url.end()) {
+            result += "/";
+        }
+    }
+    return result;
 }
