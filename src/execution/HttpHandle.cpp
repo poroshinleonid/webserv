@@ -102,7 +102,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
             return directory_listing_response(object_path);
         }
         else {
-            return no_directory_listing_response(path, url_config);
+            return no_directory_listing_response(path, url_config, server_config);
         }
     }
 
@@ -113,7 +113,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     std::ifstream file(object_path);
     if (!file.good()) {
         std::cerr << "Error: couldn't read " << object_path << "\n";
-        return status_code_to_response(500, server_config);
+        return status_code_to_response(404, server_config);
     }
 
     const std::string cgi_extension = ".py";
@@ -145,7 +145,7 @@ std::string HttpHandle::file_response(const std::string& file_path, Config& serv
     std::ifstream file(file_path);
     if (!file.good()) {
         std::cerr << "Error: couldn't read " << file_path << "\n";
-        return status_code_to_response(500, server_config);
+        return status_code_to_response(404, server_config);
     }
     std::stringstream buffer;
     buffer << file.rdbuf();
@@ -175,7 +175,7 @@ std::string HttpHandle::directory_listing_response(const std::string& directory_
     return "Directory listing for: " + directory_path;
 }
 
-std::string HttpHandle::no_directory_listing_response(const fs::path& directory_path, Config& url_config) {
+std::string HttpHandle::no_directory_listing_response(const fs::path& directory_path, Config& url_config, Config& server_config) {
     fs::path index = "index.html";
     try {
         index = url_config["index"].unwrap();
@@ -183,6 +183,7 @@ std::string HttpHandle::no_directory_listing_response(const fs::path& directory_
         // ignore
     }
     index = directory_path/index;
+    return file_response(index, server_config);
     // return "Index of directory for: " + directory_path;
 }
 
