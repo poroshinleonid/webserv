@@ -123,23 +123,40 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     return file_response(std::move(file), path.extension());
 }
 
+std::string HttpHandle::ok_response_head(ContentType t) {
+    std::string content_name;
+    switch (t) {
+        case ContentType::plain:
+            content_name = "text/plain";
+            break;
+        case ContentType::html:
+            content_name = "text/html";
+            break;
+        case ContentType::css:
+            content_name = "text/css";
+            break;
+    }
+    std::string response_head = "HTTP/1.1 200 OK\nContent-type: "
+                                + content_name + "\n\n";
+    return response_head;
+}
+
 std::string HttpHandle::file_response(std::ifstream&& file, const std::string& extension) {
     std::stringstream buffer;
     buffer << file.rdbuf();
 
     std::string content = buffer.str();
 
-    const std::string header = "HTTP/1.1 200 OK\n";
-    std::string content_type = "text/plain";
+    ContentType content_type;
     if (extension == ".html") {
-        content_type = "text/html";
+        content_type = ContentType::html;
     } else if (extension == ".css") {
-        content_type = "text/css";
+        content_type = ContentType::css;
+    } else {
+        content_type = ContentType::plain;
     }
 
-    content_type = "Content-Type: " + content_type + "\n";
-
-    return header + content_type + "\n" + content;
+    return ok_response_head(content_type) + content;
 }
 
 std::string HttpHandle::redirection_response(const std::string& redirection_url) {
@@ -153,22 +170,16 @@ std::string HttpHandle::directory_listing_response(const std::string& directory_
 }
 
 std::string HttpHandle::no_directory_listing_response(const std::string& directory_path) {
-    // TODO
-    // might want to pass filesystem::path instead of string
+    // no index -> 
     return "Index of directory for: " + directory_path;
 }
 
-static void run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path) {
-    const std::string response_prefix = R"(HTTP/1.1 200 OK
-Content-type: text/plain
-
-
-)";
+void HttpHandle::run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path) {
     const std::string command = "python3 " + script_path + " 2>&1";
     FILE* file = popen(command.c_str(), "r"); // TODO: idk if allowed
     if (!file) {
         std::cerr << "Error executing cgi: " << script_path << '\n';
-        cgi_promise.set_value(response_prefix + "Cgi failed to execute");
+        cgi_promise.set_value( + "Cgi failed to execute");
         return;
     }
 
@@ -177,7 +188,7 @@ Content-type: text/plain
     while (fgets(buffer, sizeof(buffer), file) != nullptr) {
         result += buffer;
     }
-    cgi_promise.set_value(response_prefix + result);
+    cgi_promise.set_value(ok_response_head(ContentType::plain) + result);
 }
 
 std::future<std::string> HttpHandle::execute_cgi_response(const std::string& script_path) {
