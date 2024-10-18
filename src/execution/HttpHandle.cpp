@@ -8,6 +8,7 @@
 #include <thread>
 #include <future>
 #include <unistd.h>
+#include <cassert>
 
 namespace fs = std::filesystem;
 
@@ -70,7 +71,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     try {
         root = url_config["root"].unwrap();
     } catch (std::exception) {
-        std::cerr << "config error: no root\n";
+        std::cerr << "Config error: no root\n";
         return status_code_to_response(500, server_config);
     }
 
@@ -86,7 +87,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     
     bool is_directory_listing = false;
     try {
-        if (server_config["directory_listing"].unwrap() == "ON") {
+        if (server_config["autoindex"].unwrap() == "on") {
             is_directory_listing = true;
         }
     } catch (std::exception) {
@@ -99,7 +100,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     }
     if (fs::is_directory(path)) {
         if (is_directory_listing) {
-            return directory_listing_response(object_path);
+            return directory_listing_response(path, url);
         }
         else {
             return no_directory_listing_response(path, url_config, server_config);
@@ -169,10 +170,37 @@ std::string HttpHandle::redirection_response(const std::string& redirection_url)
     return "HTTP/1.1 301 Moved Permanently\n" "location: " + redirection_url  + "\n";
 }
 
-std::string HttpHandle::directory_listing_response(const std::string& directory_path) {
-    // TODO
-    // might want to pass filesystem::path instead of string
-    return "Directory listing for: " + directory_path;
+// std::string HttpHandle::directory_listing_html(const std::string& root_path, const std::vector<std::string>& leafs) {
+//     std::string html = R"(<!DOCTYPE html>
+// <html>
+// <!--root-->
+// sep
+// <!--leaf-->
+// </html>
+// )";
+//     const std::string root_placeholded = "<!--root-->";
+//     const std::string leaf_placeholded = "<!--leaf-->";
+//     assert(html.find(root_placeholded) != html.size());
+//     assert(html.find(leaf_placeholded) != html.size());
+//     const std::string root_str = "<div class=\"root\">Index of " + root_path + "</div>";
+//     html.replace(html.find(root_placeholded), root_placeholded.size(), root_str);
+//     auto make_leaf = [](const std::string& leaf) {return "<div class=\"leaf\"><a href=\"" + leaf + "\">" + leaf + "</a></div>\n";};
+//     std::string leaf_str;
+//     for (const std::string& leaf : leafs) {
+//         leaf_str += make_leaf(leaf);
+//     }
+//     html.replace(html.find(leaf_placeholded), leaf_placeholded.size(), leaf_str);
+//     return html;
+// }
+
+std::string HttpHandle::directory_listing_response(const fs::path& directory_path, const std::string& url) {
+    std::vector<std::string> leafs;
+    // TODO: maybe ..
+    for (auto const& dir_entry : fs::directory_iterator(directory_path)) {
+        leafs.push_back(dir_entry.path().filename().string());
+    }
+    std::string html_content = directory_listing_html(url, leafs);
+    return ok_response_head(ContentType::html) + html_content;
 }
 
 std::string HttpHandle::no_directory_listing_response(const fs::path& directory_path, Config& url_config, Config& server_config) {
@@ -184,7 +212,6 @@ std::string HttpHandle::no_directory_listing_response(const fs::path& directory_
     }
     index = directory_path/index;
     return file_response(index, server_config);
-    // return "Index of directory for: " + directory_path;
 }
 
 void HttpHandle::run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path) {
