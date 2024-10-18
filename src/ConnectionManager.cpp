@@ -28,8 +28,6 @@ bool sig_stop = false;
 std::string get_responses_string(HttpConnection &connection) {
   std::string st = connection.recv_stream.str();
   connection.recv_stream.clear();
-  // write(1, "REQ", 3);
-  // std::cout << "REQUEST::::" << st << std::endl;
   std::string answ = "HTTP/1.1 200 OK\r\n";
   if (st.find("keep-alive") != string::npos) {
   // if (true) {
@@ -311,7 +309,6 @@ bool ConnectionManager::handle_poll_read(int fd) {
   if (connection.recv_done == true) {
     return false;
   }
-  (*logger).log_error("---------------------------------" + Libft::ft_itos(fd));
   if (listen_servers.find(fd) != listen_servers.end()) {
     (*logger).log_info("poll() read on SERVER socket " + Libft::ft_itos(fd));
     handle_accept(fd);
