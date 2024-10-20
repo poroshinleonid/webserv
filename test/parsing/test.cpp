@@ -66,4 +66,6 @@ int main() {
     expected.push_back("g");
     assert_vec_config_eq(whatever.get_vec("a"), expected);
     assert_vec_config_eq(whatever2["a"]["b"].get_vec("c"), expected);
+    Config def;
+    std::cout << "default constructor works\n";
 }

@@ -1,0 +1,22 @@
+in configuration file:
+* port
+* host https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.23
+* server_names TODO
+* default error pages
+* client max body size https://docs.nginx.com/nginx-management-suite/acm/how-to/policies/request-body-size-limit/#:~:text=The%20Request%20Body%20Size%20Limit,error%20code%20will%20be%20returned.
+* routes:
+    * accepted methods
+    * redirections https://developer.mozilla.org/en-US/docs/Web/HTTP/Redirections
+    *  Define a directory or a file from where the file should be searched TODO
+    * directory listing https://www.sciencedirect.com/topics/computer-science/directory-listing#:~:text=A%20directory%20listing%20is%20a,and%20directories%2C%20and%20a%20footer.
+    * default file for directory https://nginx.org/en/docs/http/ngx_http_index_module.html
+    The rest is about CGI
+
+
+
+
+Iterate over servers until find matching host:port (default port is 80)
+WWW - choose the lcoation in server config
+Route from www -> cd through the stuff until find matching directory (ofc not allow ..)
+Directory -> default file
+File -> return it's content / execute CGI

@@ -25,17 +25,17 @@ Config::Config(const std::string &filename) : depth_(0) {
   throw_if_invalid();
 }
 
-Config Config::operator[](const std::string &key) {
-  try {
-    get_value(key);
-  } catch (InvalidConfig &) {
-    throw std::out_of_range("Trying to search for a key: \"" + key +
-                            "\" in a string that is not an object");
-  }
-  if (values_found_.empty()) {
-    throw std::out_of_range("Key " + key + " not found");
-  }
-  return Config(values_found_.back(), true);
+Config Config::operator[](const std::string& key) {
+    try {
+        get_value(key);
+    }
+    catch (InvalidConfig &) {
+        throw std::out_of_range("Trying to search for a key: \"" + key + "\" in a string that is not an object");
+    }
+    if (values_found_.empty()) {
+        throw std::out_of_range("Key " + key + " not found");
+    }
+    return Config(values_found_.back(), true);
 }
 
 vector<Config> Config::get_vec(const std::string &key) {
@@ -121,21 +121,30 @@ string Config::eat_obj(const string &s) {
   throw InvalidConfig("Missing closing curly bracket");
 }
 
+// void Config::search_linklist(string s) {
+  // depth_++;
+  // while (!s.empty()) {
+  //   s = eat_link(s);
+  //   if (s.empty()) {
+  //     depth_--;
+  //     return;
 void Config::search_linklist(string s) {
-  depth_++;
-  while (!s.empty()) {
-    s = eat_link(s);
     if (s.empty()) {
-      depth_--;
-      return;
+        return;
     }
-    if (s[0] != ',')
-      throw InvalidConfig("Missing comma");
-    s = s.substr(1);
-  }
-  throw InvalidConfig("Missing key-value pair after comma");
+    depth_++;
+    while (!s.empty()) {
+        s = eat_link(s);
+        if (s.empty()) {
+            depth_--;
+            return;
+        }
+        if (s[0] != ',')
+            throw InvalidConfig("Missing comma");
+        s = s.substr(1);
+    }
+    throw InvalidConfig("Missing key-value pair after comma");
 }
-
 string Config::eat_link(string s) {
 
   if (s.empty() || s[0] != '"')

@@ -29,6 +29,14 @@ public:
    * @return std::string
    */
   std::string get_content();
+        Config(const std::string& filename); /* parses config from a file and 
+        throws if failed to open/failed to parse */
+        Config();
+        Config(const Config& other) = default;
+        Config& operator=(const Config& other) = default;
+        ~Config() = default;
+    private:
+        // Config(const std::string& content, bool /* dummy */);
 
   /**
    * @brief Get config by key.
