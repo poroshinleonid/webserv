@@ -132,7 +132,12 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     }
     const std::string cgi_extension = ".py";
     if (path.extension() == cgi_extension) {
-        return execute_cgi_response(object_path);
+        if (request.get_method() == HttpRequest::Method::POST) {
+            std::cout << request.get_body() << '\n';
+            return execute_cgi_response(object_path, request.get_body());
+        } else {
+            return execute_cgi_response(object_path, "");
+        }
     }
     return file_response(object_path, server_config);
 }
@@ -204,8 +209,8 @@ std::string HttpHandle::no_directory_listing_response(const fs::path& directory_
     return file_response(index, server_config);
 }
 
-void HttpHandle::run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path) {
-    const std::string command = "python3 " + script_path + " 2>&1";
+void HttpHandle::run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path, const std::string& arg) {
+    const std::string command = "python3 " + script_path + " \"" + arg + "\" " + " 2>&1";
     FILE* file = popen(command.c_str(), "r"); // TODO: idk if allowed
     if (!file) {
         std::cerr << "Error executing cgi: " << script_path << '\n';
@@ -221,10 +226,10 @@ void HttpHandle::run_cgi(std::promise<std::string>&& cgi_promise, const std::str
     cgi_promise.set_value(ok_response_head(ContentType::plain) + result);
 }
 
-std::future<std::string> HttpHandle::execute_cgi_response(const std::string& script_path) {
+std::future<std::string> HttpHandle::execute_cgi_response(const std::string& script_path, const std::string& arg) {
     std::promise<std::string> cgi_promise;
     std::future<std::string> cgi_future = cgi_promise.get_future();
-    std::thread t(run_cgi, std::move(cgi_promise), script_path);
+    std::thread t(run_cgi, std::move(cgi_promise), script_path, arg);
     t.detach();
     return cgi_future;
 }

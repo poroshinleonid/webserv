@@ -64,7 +64,7 @@ HttpRequest::HttpRequest(const string& s) {
         if (line == "") {
             break;
         }
-        body += line;
+        body += line + '\n';
     }
     body_ = body;
 }

@@ -29,8 +29,8 @@ class HttpHandle {
     static std::string directory_listing_response(const std::filesystem::path& directory_path, const std::string& url);
     static std::string no_directory_listing_response(const std::filesystem::path& directory_path, Config& url_config, Config& server_config);
     static std::string compose_object_path(const std::string& url, const std::string& server_url, const std::string& root);
-    static std::future<std::string> execute_cgi_response(const std::string& scipt_path);
-    static void run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path);
+    static std::future<std::string> execute_cgi_response(const std::string& scipt_path, const std::string& arg);
+    static void run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path, const std::string& arg);
     static std::string status_code_to_response(int status_code, Config& server_config);
     static std::string delete_file_response(const std::string& url_path);
 
