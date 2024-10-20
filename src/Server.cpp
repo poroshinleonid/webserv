@@ -2,7 +2,12 @@
 
 #include <iostream>
 
-Server::Server() {}
+Server::Server(): srv_sockaddr({0, 0, 0, 0}),
+      client_max_body_size(0),
+      port(0), host(""), timeout(0), cgi_timeout(0),
+      listen_fd(0), is_default(false),
+      server_name(""),
+      client_body_size(0) {}
 
 Server::~Server() {}
 

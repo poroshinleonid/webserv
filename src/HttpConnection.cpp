@@ -4,7 +4,11 @@
 #include <ctime>
 #include <unistd.h>
 
-HttpConnection::HttpConnection() {}
+HttpConnection::HttpConnection()
+    : fd(0), config(NULL), serv(NULL), last_activity(0), last_cgi_activity(0), content_length(-1), busy(false), is_connected(false), is_cgi_running(false), cgi_finished(false), cgi_result(false), socket_closed(false), is_response_ready(false), is_keep_alive(false), header_is_parsed(false), body_is_read(false), cgi_pid(0), is_chunked_transfer(false), recv_done(false) {
+    cgi_pipe[0] = 0;
+    cgi_pipe[1] = 0;
+    }
 
 HttpConnection::~HttpConnection() {
   // if (cgi_pipe[0] != 0){
@@ -16,23 +20,11 @@ HttpConnection::~HttpConnection() {
 }
 
 HttpConnection::HttpConnection(Config *cfg, Server *srv)
-    : config(cfg), serv(srv) {
+    : fd(0), config(cfg), serv(srv),  last_activity(0), last_cgi_activity(0), content_length(-1), busy(false), is_connected(false), is_cgi_running(false), cgi_finished(false), cgi_result(false), socket_closed(false), is_response_ready(false), is_keep_alive(false), header_is_parsed(false), body_is_read(false), cgi_pid(0), is_chunked_transfer(false), recv_done(false) {
   (void)cfg;
   (void)srv;
-  content_length = -1;
-  busy = false;
-  is_connected = true;
-  is_cgi_running = false;
-  cgi_finished = false;
-  socket_closed = false;
-  is_response_ready = false;
-  is_keep_alive = false;
-  header_is_parsed = false;
-  body_is_read = false;
-  cgi_pid = 0;
   cgi_pipe[0] = 0;
   cgi_pipe[1] = 0;
-  is_chunked_transfer = false;
 }
 
 //  HttpConnection::HttpConnection(int fd, Server *serv, Config *cfg)  :
