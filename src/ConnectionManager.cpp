@@ -47,23 +47,6 @@ std::string get_responses_string(HttpConnection &connection) {
   return answ;
 }
 
-// std::string get_responses_string(HttpConnection &connection) {
-//   std::string st = connection.recv_stream.str();
-//   // if (st.find("keep-alive")) {
-//   if (true) {
-//     connection.is_keep_alive = true;
-//   }
-//   std::cout << "Request:\t" << st << std::endl;
-//   (void)connection;
-//   std::string resp = "HTTP/1.1 200 OK\r\n"
-//          "Content-Type: text/plain\r\n"
-//          "Content-Length: 12\r\n"
-//          "\r\n"
-//          "Hello, world!" + 
-//          st;
-//   return resp;
-// }
-
 ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
     : config(cfg), logger(log) {
   bzero(buffer, sizeof(buffer));
