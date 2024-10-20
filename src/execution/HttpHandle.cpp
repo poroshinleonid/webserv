@@ -99,6 +99,10 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
         return status_code_to_response(404, server_config);
     }
     if (fs::is_directory(path)) {
+        if (request.get_method() == HttpRequest::Method::DELETE) {
+            std::cerr << "Error: trying to DELETE a directory\n";
+            return status_code_to_response(403, server_config);
+        }
         if (is_directory_listing) {
             return directory_listing_response(path, url);
         }
@@ -111,12 +115,21 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
         std::cerr << "Error: " + object_path + " is not dir or regular file\n";
         return status_code_to_response(500, server_config); // TODO: idk if 500
     }
+
+    if (request.get_method() == HttpRequest::Method::DELETE) {
+        bool was_removed = fs::remove(path);
+        if (!was_removed) {
+            std::cerr << "Error: couldn't remove " + object_path + "\n";
+            return status_code_to_response(500, server_config);
+        }
+        return delete_file_response(url);
+    }
+
     std::ifstream file(object_path);
     if (!file.good()) {
         std::cerr << "Error: couldn't read " << object_path << "\n";
         return status_code_to_response(404, server_config);
     }
-
     const std::string cgi_extension = ".py";
     if (path.extension() == cgi_extension) {
         return execute_cgi_response(object_path);
@@ -169,29 +182,6 @@ std::string HttpHandle::file_response(const std::string& file_path, Config& serv
 std::string HttpHandle::redirection_response(const std::string& redirection_url) {
     return "HTTP/1.1 301 Moved Permanently\n" "location: " + redirection_url  + "\n";
 }
-
-// std::string HttpHandle::directory_listing_html(const std::string& root_path, const std::vector<std::string>& leafs) {
-//     std::string html = R"(<!DOCTYPE html>
-// <html>
-// <!--root-->
-// sep
-// <!--leaf-->
-// </html>
-// )";
-//     const std::string root_placeholded = "<!--root-->";
-//     const std::string leaf_placeholded = "<!--leaf-->";
-//     assert(html.find(root_placeholded) != html.size());
-//     assert(html.find(leaf_placeholded) != html.size());
-//     const std::string root_str = "<div class=\"root\">Index of " + root_path + "</div>";
-//     html.replace(html.find(root_placeholded), root_placeholded.size(), root_str);
-//     auto make_leaf = [](const std::string& leaf) {return "<div class=\"leaf\"><a href=\"" + leaf + "\">" + leaf + "</a></div>\n";};
-//     std::string leaf_str;
-//     for (const std::string& leaf : leafs) {
-//         leaf_str += make_leaf(leaf);
-//     }
-//     html.replace(html.find(leaf_placeholded), leaf_placeholded.size(), leaf_str);
-//     return html;
-// }
 
 std::string HttpHandle::directory_listing_response(const fs::path& directory_path, const std::string& url) {
     std::vector<std::string> leafs;
@@ -397,4 +387,9 @@ std::string HttpHandle::status_code_to_response(int status_code, Config& server_
     "Content-type: text/html\n"
     "\n"
     + error_content;
+}
+
+std::string HttpHandle::delete_file_response(const std::string& url_path) {
+    std::string message = "sucesfully deleted: " + url_path + '\n';
+    return ok_response_head(ContentType::plain) + message;
 }
