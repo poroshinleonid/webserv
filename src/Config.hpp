@@ -102,6 +102,7 @@ public:
   std::string get_value_safely(const std::string &s);
 
 private:
+  // Config();
   Config(const std::string &content, bool /* dummy */);
   static string remove_spaces(const string &s);
   void throw_if_invalid();
