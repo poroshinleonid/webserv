@@ -122,6 +122,12 @@ char const* HttpRequest::BadRequest::what() const throw() {
     return std::runtime_error::what();
 }
 
+HttpRequest::RequestNotFinished::RequestNotFinished(char const* const message) throw(): std::runtime_error(message) {}
+
+char const* HttpRequest::RequestNotFinished::what() const throw() {
+    return std::runtime_error::what();
+}
+
 std::vector<std::string> HttpRequest::parse_url(const std::string& url) {
     std::vector<std::string> parsed_url = split(url, '/');
     if (url.size() != 0 && url[0] == '/') {

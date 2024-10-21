@@ -18,25 +18,34 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     try {
         request = HttpRequest(request_str);
     } catch (HttpRequest::BadRequest) {
-        return status_code_to_response(400, config /*dummy*/);
+        return status_code_to_response(400, config /*dummy*/, false /*default*/);
+    } catch (HttpRequest::RequestNotFinished) {
+        return requestNotFinished {.is_chunked = false}; // TODO
     }
 
+    bool is_keep_alive = false;
+    try {
+        if (request.get_header_at("Connection") == "Keep-Alive") {
+            is_keep_alive = true;
+        }
+    } catch (...) {/*ignore*/}
+
     if (request.get_body().size() > HttpRequest::MAX_BODY_SIZE) {
-        return status_code_to_response(413, config /*dummy*/);
+        return status_code_to_response(413, config /*dummy*/, is_keep_alive);
     }
 
     try {
         request.get_host();
         request.get_port();
     } catch (std::exception) {
-        return status_code_to_response(400, config /*dummy*/);
+        return status_code_to_response(400, config /*dummy*/, is_keep_alive);
     }
 
     Config server_config;
     try {
         server_config = select_server_config(request, config);
     } catch (std::exception) {
-        return status_code_to_response(404, config /*dummy*/);
+        return status_code_to_response(404, config /*dummy*/, is_keep_alive);
     }
 
     std::string url = request.get_url();
@@ -44,11 +53,11 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     try {
         url_config = select_url_config(url, server_config);        
     } catch (std::exception) {
-        return status_code_to_response(404, server_config);
+        return status_code_to_response(404, server_config, is_keep_alive);
     }
 
     if (url_config.key_exists("redirect")) {
-        return redirection_response(url_config["redirect"].unwrap());
+        return redirection_response(url_config["redirect"].unwrap(), is_keep_alive);
     }
 
     std::vector<std::string> allowed_methods;
@@ -64,7 +73,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     }
     std::string req_method = HttpRequest::method_to_str(request.get_method());
     if (std::all_of(allowed_methods.begin(), allowed_methods.end(), [&req_method](const std::string& method){return method != req_method;})) {
-        return status_code_to_response(405, server_config);
+        return status_code_to_response(405, server_config, is_keep_alive);
     }
 
     std::string root; // TODO (or not): add default_root thingy
@@ -72,7 +81,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
         root = url_config["root"].unwrap();
     } catch (std::exception) {
         std::cerr << "Config error: no root\n";
-        return status_code_to_response(500, server_config);
+        return status_code_to_response(500, server_config, is_keep_alive);
     }
 
     std::string server_url;
@@ -96,50 +105,49 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
 
     fs::path path(object_path);
     if (!fs::exists(path)) {
-        return status_code_to_response(404, server_config);
+        return status_code_to_response(404, server_config, is_keep_alive);
     }
     if (fs::is_directory(path)) {
         if (request.get_method() == HttpRequest::Method::DELETE) {
             std::cerr << "Error: trying to DELETE a directory\n";
-            return status_code_to_response(403, server_config);
+            return status_code_to_response(403, server_config, is_keep_alive);
         }
         if (is_directory_listing) {
-            return directory_listing_response(path, url);
+            return directory_listing_response(path, url, is_keep_alive);
         }
         else {
-            return no_directory_listing_response(path, url_config, server_config);
+            return no_directory_listing_response(path, url_config, server_config, is_keep_alive);
         }
     }
 
     if (!fs::is_regular_file(path)) {
         std::cerr << "Error: " + object_path + " is not dir or regular file\n";
-        return status_code_to_response(500, server_config); // TODO: idk if 500
+        return status_code_to_response(500, server_config, is_keep_alive); // TODO: idk if 500
     }
 
     if (request.get_method() == HttpRequest::Method::DELETE) {
         bool was_removed = fs::remove(path);
         if (!was_removed) {
             std::cerr << "Error: couldn't remove " + object_path + "\n";
-            return status_code_to_response(500, server_config);
+            return status_code_to_response(500, server_config, is_keep_alive);
         }
-        return delete_file_response(url);
+        return delete_file_response(url, is_keep_alive);
     }
 
     std::ifstream file(object_path);
     if (!file.good()) {
         std::cerr << "Error: couldn't read " << object_path << "\n";
-        return status_code_to_response(404, server_config);
+        return status_code_to_response(404, server_config, is_keep_alive);
     }
     const std::string cgi_extension = ".py";
     if (path.extension() == cgi_extension) {
         if (request.get_method() == HttpRequest::Method::POST) {
-            std::cout << request.get_body() << '\n';
-            return execute_cgi_response(object_path, request.get_body());
+            return execute_cgi_response(object_path, request.get_body(), is_keep_alive);
         } else {
-            return execute_cgi_response(object_path, "");
+            return execute_cgi_response(object_path, "", is_keep_alive);
         }
     }
-    return file_response(object_path, server_config);
+    return file_response(object_path, server_config, is_keep_alive);
 }
 
 std::string HttpHandle::ok_response_head(ContentType t) {
@@ -160,11 +168,11 @@ std::string HttpHandle::ok_response_head(ContentType t) {
     return response_head;
 }
 
-std::string HttpHandle::file_response(const std::string& file_path, Config& server_config) {
+response HttpHandle::file_response(const std::string& file_path, Config& server_config, bool is_keep_alive) {
     std::ifstream file(file_path);
     if (!file.good()) {
         std::cerr << "Error: couldn't read " << file_path << "\n";
-        return status_code_to_response(404, server_config);
+        return status_code_to_response(404, server_config, is_keep_alive);
     }
     std::stringstream buffer;
     buffer << file.rdbuf();
@@ -181,24 +189,24 @@ std::string HttpHandle::file_response(const std::string& file_path, Config& serv
         content_type = ContentType::plain;
     }
 
-    return ok_response_head(content_type) + content;
+    return normalResponse { .response = ok_response_head(content_type) + content, .is_keep_alive = is_keep_alive };
 }
 
-std::string HttpHandle::redirection_response(const std::string& redirection_url) {
-    return "HTTP/1.1 301 Moved Permanently\n" "location: " + redirection_url  + "\n";
+response HttpHandle::redirection_response(const std::string& redirection_url, bool is_keep_alive) {
+    return normalResponse { .response = "HTTP/1.1 301 Moved Permanently\n" "location: " + redirection_url  + "\n", .is_keep_alive = is_keep_alive };
 }
 
-std::string HttpHandle::directory_listing_response(const fs::path& directory_path, const std::string& url) {
+response HttpHandle::directory_listing_response(const fs::path& directory_path, const std::string& url, bool is_keep_alive) {
     std::vector<std::string> leafs;
     // TODO: maybe ..
     for (auto const& dir_entry : fs::directory_iterator(directory_path)) {
         leafs.push_back(dir_entry.path().filename().string());
     }
     std::string html_content = directory_listing_html(url, leafs);
-    return ok_response_head(ContentType::html) + html_content;
+    return normalResponse { .response = ok_response_head(ContentType::html) + html_content, .is_keep_alive = is_keep_alive };
 }
 
-std::string HttpHandle::no_directory_listing_response(const fs::path& directory_path, Config& url_config, Config& server_config) {
+response HttpHandle::no_directory_listing_response(const fs::path& directory_path, Config& url_config, Config& server_config, bool is_keep_alive) {
     fs::path index = "index.html";
     try {
         index = url_config["index"].unwrap();
@@ -206,32 +214,40 @@ std::string HttpHandle::no_directory_listing_response(const fs::path& directory_
         // ignore
     }
     index = directory_path/index;
-    return file_response(index, server_config);
+    return file_response(index, server_config, is_keep_alive);
 }
 
-void HttpHandle::run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path, const std::string& arg) {
-    const std::string command = "python3 " + script_path + " \"" + arg + "\" " + " 2>&1";
-    FILE* file = popen(command.c_str(), "r"); // TODO: idk if allowed
-    if (!file) {
-        std::cerr << "Error executing cgi: " << script_path << '\n';
-        cgi_promise.set_value( + "Cgi failed to execute");
-        return;
+response HttpHandle::execute_cgi_response(std::string script_path, std::string arg, bool is_keep_alive) {
+    int fd[2];
+    if (pipe(fd) == -1) {
+        std::cerr << "Pipe error\n";
+        exit(1);
     }
-
-    std::string result;
-    char buffer[128];
-    while (fgets(buffer, sizeof(buffer), file) != nullptr) {
-        result += buffer;
+    int pid_t = fork();
+    if (pid_t == -1) {
+        std::cerr << "Fork error\n";
+        exit(1);
     }
-    cgi_promise.set_value(ok_response_head(ContentType::plain) + result);
-}
-
-std::future<std::string> HttpHandle::execute_cgi_response(const std::string& script_path, const std::string& arg) {
-    std::promise<std::string> cgi_promise;
-    std::future<std::string> cgi_future = cgi_promise.get_future();
-    std::thread t(run_cgi, std::move(cgi_promise), script_path, arg);
-    t.detach();
-    return cgi_future;
+    if (pid_t == 0) {
+        close(fd[0]);
+        if (dup2(fd[1], STDOUT_FILENO) == -1) {
+            std::cerr << "dup2 error\n";
+            exit(1);
+        }
+        close(fd[1]);
+        char* const argv[] = {const_cast<char *>(script_path.c_str()), const_cast<char *>(arg.c_str()), nullptr};
+        sleep(1);
+        if (execve(script_path.c_str(), argv, NULL) == -1) { // TODO: how to write the whole response instead of script output
+            std::cerr << "Error executing cgi\n";
+            exit(1);
+        }
+        exit(1);
+    }
+    close(fd[1]);
+    cgiResponse res {.cgi_pid = pid_t, .is_keep_alive = is_keep_alive};
+    res.cgi_pipe[0] = fd[0];
+    res.cgi_pipe[1] = fd[1];
+    return res;
 }
 
 Config HttpHandle::select_server_config(const HttpRequest& request, Config& config) {
@@ -310,7 +326,7 @@ std::string HttpHandle::compose_object_path(const std::string& url, const std::s
     return joined_result;
 }
 
-std::string HttpHandle::status_code_to_response(int status_code, Config& server_config) {
+response HttpHandle::status_code_to_response(int status_code, Config& server_config, bool is_keep_alive) {
     const std::unordered_map<int, std::string> httpStatusCodes = {
         // 4xx Client Errors
         {400, "Bad Request"},
@@ -387,14 +403,14 @@ std::string HttpHandle::status_code_to_response(int status_code, Config& server_
     const std::string ERROR_MARKER = "$ERROR$";
     error_content.replace(error_content.find(ERROR_MARKER), ERROR_MARKER.size(), error_message);
 
-    return "HTTP/1.1 "
+    return normalResponse { .response = "HTTP/1.1 "
     + error_message + "\n"
     "Content-type: text/html\n"
     "\n"
-    + error_content;
+    + error_content, .is_keep_alive = is_keep_alive };
 }
 
-std::string HttpHandle::delete_file_response(const std::string& url_path) {
+response HttpHandle::delete_file_response(const std::string& url_path, bool is_keep_alive) {
     std::string message = "sucesfully deleted: " + url_path + '\n';
-    return ok_response_head(ContentType::plain) + message;
+    return normalResponse { .response = ok_response_head(ContentType::plain) + message, .is_keep_alive = is_keep_alive };
 }
