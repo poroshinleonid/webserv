@@ -21,7 +21,7 @@ std::string get_responses_string(HttpConnection &connection) {
     connection.is_response_ready = true;
     connection.is_keep_alive = resp.is_keep_alive;
     return resp.response;
-  } catch (std::bad_variant_access) {/*ignore*/}
+  } catch (std::bad_variant_access &) {/*ignore*/}
   try {
     auto resp = std::get<HttpHandle::cgiResponse>(response);
     connection.recv_stream.str(std::string());
@@ -31,12 +31,12 @@ std::string get_responses_string(HttpConnection &connection) {
     connection.cgi_pipe[0] = resp.cgi_pipe[0];
     connection.cgi_pipe[1] = resp.cgi_pipe[1];
     return "";
-  } catch (std::bad_variant_access) {/*ignore*/}
+  } catch (std::bad_variant_access &) {/*ignore*/}
   try {
     auto resp = std::get<HttpHandle::requestNotFinished>(response);
     connection.is_chunked_transfer = resp.is_chunked_transfer;
     return "";
-  } catch (std::bad_variant_access) {
+  } catch (std::bad_variant_access &) {
     std::cerr << "You wouldn't have such problem in rust\n";
     exit(1);
   }
@@ -50,9 +50,9 @@ namespace HttpHandle {
 
         try {
             request = HttpRequest(request_str);
-        } catch (HttpRequest::BadRequest) {
+        } catch (HttpRequest::BadRequest &) {
             return status_code_to_response(400, config /*dummy*/, false /*default*/);
-        } catch (HttpRequest::RequestNotFinished) {
+        } catch (HttpRequest::RequestNotFinished &) {
             return requestNotFinished {.is_chunked_transfer = true};
         }
 
@@ -70,14 +70,15 @@ namespace HttpHandle {
         try {
             request.get_host();
             request.get_port();
-        } catch (std::exception) {
+        } catch (std::exception &) {
             return status_code_to_response(400, config /*dummy*/, is_keep_alive);
         }
 
         Config server_config;
         try {
             server_config = select_server_config(request, config);
-        } catch (std::exception) {
+        } catch (std::exception &e) {
+            std::cout << e.what() << std::endl;
             return status_code_to_response(404, config /*dummy*/, is_keep_alive);
         }
 
@@ -85,7 +86,8 @@ namespace HttpHandle {
         Config url_config;
         try {
             url_config = select_url_config(url, server_config);        
-        } catch (std::exception) {
+        } catch (std::exception &) {
+            std::cout << "404 2" << std::endl;
             return status_code_to_response(404, server_config, is_keep_alive);
         }
 
@@ -99,7 +101,7 @@ namespace HttpHandle {
             for (Config& method_cfg : allowed_methods_cfg) {
                 try {
                     allowed_methods.push_back(method_cfg.unwrap());
-                } catch (std::invalid_argument) {
+                } catch (std::invalid_argument &) {
                     // ignore
                 }
             }
@@ -112,7 +114,7 @@ namespace HttpHandle {
         std::string root; // TODO (or not): add default_root thingy
         try {
             root = url_config["root"].unwrap();
-        } catch (std::exception) {
+        } catch (std::exception &) {
             std::cerr << "Config error: no root\n";
             return status_code_to_response(500, server_config, is_keep_alive);
         }
@@ -132,12 +134,13 @@ namespace HttpHandle {
             if (server_config["autoindex"].unwrap() == "on") {
                 is_directory_listing = true;
             }
-        } catch (std::exception) {
+        } catch (std::exception &) {
             is_directory_listing = false;
         }
 
         fs::path path(object_path);
         if (!fs::exists(path)) {
+            std::cout << "404" << std::endl;
             return status_code_to_response(404, server_config, is_keep_alive);
         }
         if (fs::is_directory(path)) {
@@ -277,7 +280,9 @@ namespace HttpHandle {
             exit(1);
         }
         close(fd[1]);
-        cgiResponse res {.cgi_pid = pid_t, .is_keep_alive = is_keep_alive};
+        cgiResponse res;
+        res.cgi_pid = pid_t;
+        res.is_keep_alive = is_keep_alive;
         res.cgi_pipe[0] = fd[0];
         res.cgi_pipe[1] = fd[1];
         return res;
@@ -293,17 +298,17 @@ namespace HttpHandle {
             try {
                 std::string port_str = server_config["listen"].unwrap();
                 server_port = std::stoi(port_str);
-            } catch (std::invalid_argument) {
+            } catch (std::invalid_argument &) {
                 continue;
-            } catch (std::out_of_range) {
+            } catch (std::out_of_range &) {
                 server_port = 80; // default HTTP port
             }
 
             try {
                 server_host = server_config["host"].unwrap();
-            } catch (std::out_of_range) {
+            } catch (std::out_of_range &) {
                 continue;
-            } catch (std::invalid_argument) {
+            } catch (std::invalid_argument &) {
                 continue;
             }
 
@@ -325,7 +330,7 @@ namespace HttpHandle {
             std::string location_url;
             try {
                 location_url = url_config["url"].unwrap();
-            } catch (std::exception) {
+            } catch (std::exception &) {
                 continue;
             }
             vector<std::string> parsed_location_url = HttpRequest::parse_url(location_url);
@@ -430,7 +435,7 @@ namespace HttpHandle {
             std::stringstream buffer;
             buffer << file.rdbuf();
             error_content = buffer.str();
-        } catch (std::exception) {
+        } catch (std::exception &) {
             // keep default content
         }
         const std::string ERROR_MARKER = "$ERROR$";

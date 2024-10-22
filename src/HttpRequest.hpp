@@ -39,5 +39,10 @@ class HttpRequest {
             BadRequest(char const* const message) throw();
             virtual char const* what() const throw();
     };
+    class RequestNotFinished: std::runtime_error {
+        public:
+            RequestNotFinished(char const* const message) throw();
+            virtual char const* what() const throw();
+    };
 };
 

@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <sstream>
 #include <array>
+#include <vector>
 
 class HttpRequest {
   using string = std::string;
@@ -36,11 +37,6 @@ class HttpRequest {
     class BadRequest: std::runtime_error {
         public:
             BadRequest(char const* const message) throw();
-            virtual char const* what() const throw();
-    };
-    class RequestNotFinished: std::runtime_error {
-        public:
-            RequestNotFinished(char const* const message) throw();
             virtual char const* what() const throw();
     };
 };
