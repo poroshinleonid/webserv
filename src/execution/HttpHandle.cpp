@@ -11,6 +11,7 @@
 #include <cassert>
 
 std::string get_responses_string(HttpConnection &connection) {
+  // TODO: (maybe) response to multiple requests
   std::string request_str = connection.recv_stream.str();
   Config config(*connection.config);
   HttpHandle::response response = HttpHandle::HttpHandle::compose_response(request_str, config);
@@ -52,7 +53,7 @@ namespace HttpHandle {
         } catch (HttpRequest::BadRequest) {
             return status_code_to_response(400, config /*dummy*/, false /*default*/);
         } catch (HttpRequest::RequestNotFinished) {
-            return requestNotFinished {.is_chunked_transfer = false}; // TODO
+            return requestNotFinished {.is_chunked_transfer = true};
         }
 
         bool is_keep_alive = false;

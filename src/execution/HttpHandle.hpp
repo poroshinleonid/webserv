@@ -49,7 +49,6 @@ namespace HttpHandle {
       static response no_directory_listing_response(const std::filesystem::path& directory_path, Config& url_config, Config& server_config, bool is_keep_alive);
       static std::string compose_object_path(const std::string& url, const std::string& server_url, const std::string& root);
       static response execute_cgi_response(std::string scipt_path, std::string arg, bool is_keep_alive);
-      // static void run_cgi(std::promise<std::string>&& cgi_promise, const std::string& script_path, const std::string& arg); // TODO
       static response status_code_to_response(int status_code, Config& server_config, bool is_keep_alive);
       static response delete_file_response(const std::string& url_path, bool is_keep_alive);
 
