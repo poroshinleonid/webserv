@@ -25,8 +25,8 @@ Config::Config(const std::string &filename) : depth_(0) {
   throw_if_invalid();
 }
 
-// Config::Config(): Config("{}", true) {
-// }
+Config::Config(): Config("{}", true) {
+}
 
 Config Config::operator[](const std::string &key) {
   try {

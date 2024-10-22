@@ -1,60 +1,43 @@
-#ifndef HttpRequest_HPP
-#define HttpRequest_HPP
+#pragma once
 
 #include <string>
-#include <map>
+#include <unordered_map>
+#include <sstream>
+#include <array>
+#include <vector>
 
-enum http_method {
-  HTTP_METH_GET,
-  HTTP_METH_HEAD,
-  HTTP_METH_POST,
-  HTTP_METH_PUT,
-  HTTP_METH_DELETE,
-  HTTP_METH_CONNECT,
-  HTTP_METH_OPTIONS,
-  HTTP_METH_TRACE,
-  HTTP_METH_PATCH,
+class HttpRequest {
+  using string = std::string;
+  using stringstream = std::stringstream;
+  public:
+    static const int MAX_BODY_SIZE = 1 * 1000 * 1000;
+    static const std::array<string, 2> allowedHttpVersions;
+    static std::vector<std::string> parse_url(const std::string& url);
+    static std::string join_url(const std::vector<std::string>& parsed_url);
+    enum class Method {GET, POST, DELETE};
+    HttpRequest();
+    HttpRequest(const string& s);
+    HttpRequest(const HttpRequest& other) = default;
+    HttpRequest& operator=(const HttpRequest& other) = default;
+    ~HttpRequest() = default;
+
+    Method get_method() const;
+    static std::string method_to_str(const Method& method);
+    string get_url() const;
+    string get_header_at(const string& s) const;
+    string get_body() const;
+    std::string get_host() const; // throws if none
+    int get_port() const; // 80 if none, throws if not int / negative
+  private:
+    Method method_ = Method::GET;
+    string url_;
+    std::unordered_map<string, string> headers_;
+    string body_;
+  public:
+    class BadRequest: std::runtime_error {
+        public:
+            BadRequest(char const* const message) throw();
+            virtual char const* what() const throw();
+    };
 };
 
-class	HttpRequest {
-public:
-  HttpRequest();
-  HttpRequest(HttpRequest const &other);
-  ~HttpRequest();
-  HttpRequest &operator=(const HttpRequest &obj);
-
-public:
-  HttpRequest(const std::string &request_string);
-
-
-public:
-  /**
-   * @brief convert the whole request to a string
-   *
-   * @return std::string 
-   */
-  std::string to_string() const;
-
-
-// internal workings data
-public:
-  bool is_valid;
-  bool is_for_cgi;
-  std::string client_hostname;
-  std::string client_port;
-
-// Actual request fields
-public:
-  std::string header;
-  std::string body;
-  http_method method;
-  std::string uri;
-  std::string version;
-  std::map<std::string, std::string> header_params;
-  std::map<std::string, std::string> query_params;
-
-
-
-};
-
-#endif

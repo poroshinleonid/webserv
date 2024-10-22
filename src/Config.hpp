@@ -15,6 +15,7 @@ config["key1"].get_vec["key2"][1]["key2"].unwrap() to get values
 */
 class Config {
 public:
+  Config();
   /**
    * @brief Return content string.
    *
@@ -102,7 +103,6 @@ public:
   std::string get_value_safely(const std::string &s);
 
 private:
-  // Config();
   Config(const std::string &content, bool /* dummy */);
   static string remove_spaces(const string &s);
   void throw_if_invalid();

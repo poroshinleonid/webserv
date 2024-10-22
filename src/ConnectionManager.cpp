@@ -2,6 +2,9 @@
 #include "Config.hpp"
 #include "HttpConnection.hpp"
 #include "Server.hpp"
+#include "HttpHandle.hpp"
+#include "HttpRequest.hpp"
+#include "Base.hpp"
 #include "Libft.hpp"
 
 #include <algorithm>
@@ -10,6 +13,8 @@
 #include <map>
 #include <sstream>
 #include <vector>
+#include <future>
+#include <thread>
 
 #include <arpa/inet.h>
 #include <ctime>
@@ -25,26 +30,41 @@
 
 bool sig_stop = false;
 
+bool is_response_done(const std::string resp_str) {
+  if (resp_str.find("\r\n\r\n")) {
+    return true;
+  }
+  return false;
+}
+
 std::string get_responses_string(HttpConnection &connection) {
   std::string st = connection.recv_stream.str();
-  connection.recv_stream.clear();
-  // write(1, "REQ", 3);
-  // std::cout << "REQUEST::::" << st << std::endl;
-  std::string answ = "HTTP/1.1 200 OK\r\n";
-  if (st.find("keep-alive") != string::npos) {
-  // if (true) {
-    connection.is_keep_alive = true;
-    std::cout << "KEEP";
-    answ += "Connection: keep-alive\r\n";
+  if (is_response_done(st)) {
+    auto resp = HttpHandle::compose_response(st, *connection.config);
+    // std::cout << std::get<std::string>(resp) << '\n';
+    auto& future = std::get<std::future<std::string>>(resp);
+    while (!future_is_ready(future)) {
+        std::cout << "still not ready\n";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    return future.get();
   }
-  answ += "Content-Type: text/plain\r\n"
-          "Content-Length: 12\r\n";
-  answ += "\r\n"
-         "Hello world!";
-  // std::cout << connection.recv_stream.str();
-  connection.recv_done = true;
-  // std::cout << answ;
-  return answ;
+  return "";
+  // connection.recv_stream.clear();
+  // // write(1, "REQ", 3);
+  // // std::cout << "REQUEST::::" << st << std::endl;
+  // std::string answ = "HTTP/1.1 200 OK\r\n";
+  // if (st.find("keep-alive") != string::npos) {
+  // // if (true) {
+  //   connection.is_keep_alive = true;
+  //   answ += "Connection: keep-alive\r\n";
+  // }
+  // answ += "Content-Type: text/plain\r\n"
+  //         "Content-Length: 12\r\n";
+  // answ += "\r\n"
+  //        "Hello world!";
+  // connection.recv_done = true;
+  // return answ;
 }
 
 ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
@@ -284,6 +304,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   fds[find_fd_index(fd)].revents = 0;
   // fds[find_fd_index(fd)].revents = static_cast<short>(0);
   // (*logger).log_info("poll() read on socket " + Libft::ft_itos(fd));
+
   HttpConnection &connection = connections[fd];
   if (connection.is_cgi_running) {
     if (cgi_timed_out(fd)) {

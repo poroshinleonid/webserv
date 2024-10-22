@@ -4,7 +4,7 @@
 #include "Config.hpp"
 #include "HttpConnection.hpp"
 #include "HttpRequest.hpp"
-#include "HttpResponse.hpp"
+// #include "HttpResponse.hpp"
 #include "Logger.hpp"
 
 #include <cstring>

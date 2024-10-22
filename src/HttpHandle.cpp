@@ -17,7 +17,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
 
     try {
         request = HttpRequest(request_str);
-    } catch (HttpRequest::BadRequest) {
+    } catch (HttpRequest::BadRequest &) {
         return status_code_to_response(400, config /*dummy*/);
     }
 
@@ -28,14 +28,14 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     try {
         request.get_host();
         request.get_port();
-    } catch (std::exception) {
+    } catch (std::exception &) {
         return status_code_to_response(400, config /*dummy*/);
     }
 
     Config server_config;
     try {
         server_config = select_server_config(request, config);
-    } catch (std::exception) {
+    } catch (std::exception &) {
         return status_code_to_response(404, config /*dummy*/);
     }
 
@@ -43,7 +43,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     Config url_config;
     try {
         url_config = select_url_config(url, server_config);        
-    } catch (std::exception) {
+    } catch (std::exception &) {
         return status_code_to_response(404, server_config);
     }
 
@@ -57,7 +57,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
         for (Config& method_cfg : allowed_methods_cfg) {
             try {
                 allowed_methods.push_back(method_cfg.unwrap());
-            } catch (std::invalid_argument) {
+            } catch (std::invalid_argument &) {
                 // ignore
             }
         }
@@ -70,7 +70,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
     std::string root; // TODO (or not): add default_root thingy
     try {
         root = url_config["root"].unwrap();
-    } catch (std::exception) {
+    } catch (std::exception &) {
         std::cerr << "Config error: no root\n";
         return status_code_to_response(500, server_config);
     }
@@ -90,7 +90,7 @@ response HttpHandle::compose_response(const std::string& request_str, Config& co
         if (server_config["autoindex"].unwrap() == "on") {
             is_directory_listing = true;
         }
-    } catch (std::exception) {
+    } catch (std::exception &) {
         is_directory_listing = false;
     }
 
@@ -244,17 +244,17 @@ Config HttpHandle::select_server_config(const HttpRequest& request, Config& conf
         try {
             std::string port_str = server_config["listen"].unwrap();
             server_port = std::stoi(port_str);
-        } catch (std::invalid_argument) {
+        } catch (std::invalid_argument &) {
             continue;
-        } catch (std::out_of_range) {
+        } catch (std::out_of_range &) {
             server_port = 80; // default HTTP port
         }
 
         try {
             server_host = server_config["host"].unwrap();
-        } catch (std::out_of_range) {
+        } catch (std::out_of_range &) {
             continue;
-        } catch (std::invalid_argument) {
+        } catch (std::invalid_argument &) {
             continue;
         }
 
@@ -276,7 +276,7 @@ Config HttpHandle::select_url_config(const std::string& url, Config& server_conf
         std::string location_url;
         try {
             location_url = url_config["url"].unwrap();
-        } catch (std::exception) {
+        } catch (std::exception &) {
             continue;
         }
         vector<std::string> parsed_location_url = HttpRequest::parse_url(location_url);
@@ -381,7 +381,7 @@ std::string HttpHandle::status_code_to_response(int status_code, Config& server_
         std::stringstream buffer;
         buffer << file.rdbuf();
         error_content = buffer.str();
-    } catch (std::exception) {
+    } catch (std::exception &) {
         // keep default content
     }
     const std::string ERROR_MARKER = "$ERROR$";

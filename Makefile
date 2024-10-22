@@ -17,7 +17,13 @@ SOURCE_FILES := \
 								HttpConnection.cpp \
 								Logger.cpp \
 								Server.cpp \
-								Libft.cpp
+								Libft.cpp \
+								Base.cpp \
+								HttpHandle.cpp \
+								HttpRequest.cpp \
+								DirectoryListing.cpp
+
+
 
 
 SOURCES := $(addprefix $(SRCDIR)/,$(SOURCE_FILES))
