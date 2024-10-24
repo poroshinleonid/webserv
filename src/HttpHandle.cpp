@@ -253,7 +253,7 @@ namespace HttpHandle {
         return file_response(index, server_config, is_keep_alive);
     }
 
-    response HttpHandle::execute_cgi_response(std::string script_path, std::string arg, bool is_keep_alive) {
+    response HttpHandle::execute_cgi_response(const std::string &script_path, const std::string &arg, bool is_keep_alive) {
         int fd[2];
         if (pipe(fd) == -1) {
             std::cerr << "Pipe error\n";

@@ -305,7 +305,6 @@ bool ConnectionManager::handle_poll_read(int fd) {
   if (bytes_recvd < 0) {
     logger->log_error("recv failed on socket " + Libft::ft_itos(fd) +
                       ", closing the connection.");
-    exit(1);
     close_connection(fd);
     return true;
   }
@@ -458,7 +457,7 @@ void ConnectionManager::close_connection(int fd) {
     kill_cgi(fd);
   }
   for (std::vector<struct pollfd>::iterator it = fds.begin();
-       it != fds.end();it++) {
+       it != fds.end();++it) {
     if (it->fd == fd) {
       fds.erase(it);
       break;
@@ -510,15 +509,15 @@ void ConnectionManager::shutdown_server(int listen_fd) {
         it != connections.end();) {
     if (it->second.serv == srv) {
       int fd_to_remove = it->second.fd;
-      it++;
+      ++it;
       close_connection(fd_to_remove);
       continue;
     }
-    it++;
+    +it;
   }
   close(srv->listen_fd);
   for (std::vector<struct pollfd>::iterator it = fds.begin();
-       it != fds.end();it++) {
+       it != fds.end();+it) {
     if (it->fd == listen_fd) {
       fds.erase(it);
       break;
@@ -543,13 +542,10 @@ int ConnectionManager::handle_poll_error(int err_num) {
     shutdown();
     return 0;
   } else if (err_num == EINVAL) {
-    logger->log_error("poll() error - EFAULT");
-    return -1;
-  } else if (err_num == EINVAL) {
-    logger->log_error("poll() error - EFAULT");
+    logger->log_error("poll() error - EINVAL");
     return -1;
   } else if (err_num == ENOMEM) {
-    logger->log_error("poll() error - EFAULT");
+    logger->log_error("poll() error - ENOMEM");
     return -1;
   } else {
     logger->log_error("poll() error - Unknown");
@@ -564,7 +560,6 @@ int ConnectionManager::find_fd_index(int system_fd) {
     }
   }
   throw std::out_of_range("The pollfd struct with the sought-after ->fd is not found");
-  return 0;
 }
 
 
@@ -584,7 +579,7 @@ void ConnectionManager::print_connection_manager() {
 
   std::cout << "Connections list:" << std::endl;
   for (std::map<int, HttpConnection>::iterator it = connections.begin();
-       it != connections.end(); it++) {
+       it != connections.end(); ++it) {
     std::cout << "\t" << it->first << ": ";
     it->second.print_connection();
     // std::cout << std::endl;
@@ -593,7 +588,7 @@ void ConnectionManager::print_connection_manager() {
 
   std::cout << "listen_servers list:" << std::endl;
   for (std::map<int, Server>::iterator it = listen_servers.begin();
-       it != listen_servers.end(); it++) {
+       it != listen_servers.end(); i++t) {
     std::cout << "\t{" << it->first << ": \n";
     it->second.print_server();
   }
@@ -601,7 +596,7 @@ void ConnectionManager::print_connection_manager() {
 
   std::cout << "pipe_to_socket list:" << std::endl;
   for (std::map<int, int>::iterator it = pipe_to_socket.begin();
-       it != pipe_to_socket.end(); it++) {
+       it != pipe_to_socket.end(); ++it) {
     std::cout << "\t" << it->first << ": ";
     std::cout << it->second;
     std::cout << std::endl;

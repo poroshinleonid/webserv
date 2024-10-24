@@ -75,7 +75,7 @@ std::string Config::get_content() { return content_; }
 string Config::remove_spaces(const string &s) {
   string res = "";
   bool in_quote = false;
-  for (std::string::const_iterator it = s.begin(); it < s.end(); it++) {
+  for (std::string::const_iterator it = s.begin(); it < s.end(); ++it) {
     if (*it == '"')
       in_quote = !in_quote;
     if (in_quote || !isspace(static_cast<unsigned char>(*it)))
@@ -248,7 +248,6 @@ unsigned long Config::string_to_ip(const std::string &ip_string) {
   for (int i = 0; i < 4; ++i) {
     if (!(ip_stream >> cur_8_bits) || cur_8_bits < 0 || cur_8_bits >= 256) {
       throw InvalidConfig("Incorrect ip address: " + ip_string);
-      return 0;
     }
     s_addr <<= 8;
     s_addr += cur_8_bits;
