@@ -30,43 +30,6 @@
 
 bool sig_stop = false;
 
-bool is_response_done(const std::string resp_str) {
-  if (resp_str.find("\r\n\r\n")) {
-    return true;
-  }
-  return false;
-}
-
-// std::string get_responses_string(HttpConnection &connection) {
-//   std::string st = connection.recv_stream.str();
-//   if (is_response_done(st)) {
-//     auto resp = HttpHandle::compose_response(st, *connection.config);
-//     // std::cout << std::get<std::string>(resp) << '\n';
-//     auto& future = std::get<std::future<std::string>>(resp);
-//     while (!future_is_ready(future)) {
-//         std::cout << "still not ready\n";
-//         std::this_thread::sleep_for(std::chrono::seconds(1));
-//     }
-//     return future.get();
-//   }
-//   return "";
-//   // connection.recv_stream.clear();
-//   // // write(1, "REQ", 3);
-//   // // std::cout << "REQUEST::::" << st << std::endl;
-//   // std::string answ = "HTTP/1.1 200 OK\r\n";
-//   // if (st.find("keep-alive") != string::npos) {
-//   // // if (true) {
-//   //   connection.is_keep_alive = true;
-//   //   answ += "Connection: keep-alive\r\n";
-//   // }
-//   // answ += "Content-Type: text/plain\r\n"
-//   //         "Content-Length: 12\r\n";
-//   // answ += "\r\n"
-//   //        "Hello world!";
-//   // connection.recv_done = true;
-//   // return answ;
-// }
-
 ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
     : config(cfg), logger(log) {
   bzero(buffer, sizeof(buffer));
