@@ -13,14 +13,16 @@
 
 std::string get_responses_string(HttpConnection &connection) {
   // TODO: (maybe) response to multiple requests
-  std::string request_str = connection.recv_stream.str();
+  // std::string request_str = connection.recv_stream.str();
+  std::string request_str = connection.recv_buffer;
   std::cout << "Request to handle: [" << request_str << "]" << std::endl;
   Config config(*connection.config);
   HttpHandle::response response =
       HttpHandle::HttpHandle::compose_response(request_str, config);
   try {
     auto resp = std::get<HttpHandle::normalResponse>(response);
-    connection.recv_stream.str(std::string());
+    connection.recv_buffer = "";
+    // connection.recv_stream.str(std::string());
     connection.is_response_ready = true;
     connection.is_keep_alive = resp.is_keep_alive;
     return resp.response;
@@ -28,7 +30,8 @@ std::string get_responses_string(HttpConnection &connection) {
   }
   try {
     auto resp = std::get<HttpHandle::cgiResponse>(response);
-    connection.recv_stream.str(std::string());
+    connection.recv_buffer = "";
+    // connection.recv_stream.str(std::string());
     connection.is_keep_alive = resp.is_keep_alive;
     connection.is_cgi_running = true;
     connection.cgi_finished = false;
@@ -51,15 +54,29 @@ std::string get_responses_string(HttpConnection &connection) {
 namespace HttpHandle {
 namespace fs = std::filesystem;
 
+bool is_request_finished(const std::string &request_str) {
+  if (request_str.find("\r\n\r\n") != std::string::npos) {
+    if (request_str.find("Content-Length: ") != std::string::npos) {
+      return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 3) != std::string::npos);
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool check_chunked_transfer(const std::string &request_str) {
+  (void)request_str;
+  return false;
+}
+
 response HttpHandle::compose_response(const std::string &request_str,
                                       Config &config) {
   HttpRequest request;
-
-  if (request_str.find("\r\n\r\n") == std::string::npos) {
-    std::cout <<"REQUEST NOT FINISHED" << std::endl;
-    return requestNotFinished{.is_chunked_transfer = true};
+  
+  if (is_request_finished(request_str) == false) {
+    return requestNotFinished{.is_chunked_transfer = check_chunked_transfer(request_str)};
   }
-
   try {
     request = HttpRequest(request_str);
   } catch (HttpRequest::BadRequest &) {

@@ -6,6 +6,10 @@
 #include <unordered_map>
 #include <vector>
 
+#define CRLF "\r\n"
+#define CHUNKTERM "0\r\n\r\n"
+#define SP ' '
+
 class HttpRequest {
   using string = std::string;
   using stringstream = std::stringstream;

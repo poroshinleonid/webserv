@@ -1,6 +1,7 @@
 #include "HttpConnection.hpp"
 #include "Logger.hpp"
 #include "Server.hpp"
+#include "HttpRequest.hpp"
 
 #include <ctime>
 #include <unistd.h>
@@ -41,8 +42,8 @@ HttpConnection::HttpConnection(Config *cfg, Logger *log, Server *srv)
 HttpConnection::HttpConnection(HttpConnection const &other)
     : fd(other.fd), config(other.config), logger(other.logger),
       serv(other.serv), recv_buffer(other.recv_buffer),
-      send_buffer(other.send_buffer), header_str(other.header_str),
-      body_str(other.body_str), last_activity(other.last_activity),
+      send_buffer(other.send_buffer), chunked_chunk(other.chunked_chunk),
+      next_requests_str(other.next_requests_str), last_activity(other.last_activity),
       last_cgi_activity(other.last_cgi_activity),
       content_length(other.content_length), is_connected(other.is_connected),
       is_cgi_running(other.is_cgi_running), cgi_response(other.cgi_response),
@@ -68,8 +69,8 @@ HttpConnection &HttpConnection::operator=(const HttpConnection &other) {
   serv = other.serv;
   recv_buffer = other.recv_buffer;
   send_buffer = other.send_buffer;
-  header_str = other.header_str;
-  body_str = other.body_str;
+  chunked_chunk = other.chunked_chunk;
+  next_requests_str = other.next_requests_str;
   last_activity = other.last_activity;
   last_cgi_activity = other.last_cgi_activity;
   content_length = other.content_length;
@@ -98,17 +99,56 @@ void HttpConnection::update_last_cgi_activity() {
   last_cgi_activity = std::time(&last_cgi_activity);
 }
 
+HttpChunk HttpConnection::parse_http_chunk() {
+  std::string &data = recv_chunk;
+  HttpChunk chunk;
+  if (data.find(CHUNKTERM) == 0) {
+    data.erase(0, 5);
+    next_requests_str = data;
+    data.clear();
+    chunk.state = HttpChunkState::END_CHUNK;
+    chunk.content = "\r\n\r\n";
+    return chunk;
+  }
+  do {
+    size_t hex_end_pos = data.find(CRLF);
+    if (hex_end_pos == std::string::npos) {
+      break;
+    }
+    std::string chunk_sz_hex = data.substr(0, hex_end_pos);
+    size_t chunk_size;
+    try {
+      std::istringstream(chunk_sz_hex) >> std::hex >> chunk_size;
+    } catch (...) {
+      break;
+    }
+    if (data.size() < hex_end_pos + 2 + chunk_size) {
+      break;
+    }
+    data.erase(0, hex_end_pos + 2);
+    if (data.find(CRLF) != chunk_size) {
+      break;
+    }
+    chunk.content = data.substr(0, chunk_size);
+    data.erase(0, chunk_size + 2);
+    data.clear();
+    chunk.state = HttpChunkState::DATA_CHUNK;
+    return chunk;
+  } while (false);
+  chunk.state = HttpChunkState::NOT_A_CHUNK;
+  return chunk;
+}
+
+
 #define DEBUG
 #ifdef DEBUG
 void HttpConnection::print_connection() {
   std::cout << "{";
   std::cout << fd << " ";
-  // std::cout << recv_stream << " ";
   std::cout << (*config).unwrap() << " ";
   std::cout << recv_buffer << " ";
   std::cout << send_buffer << " ";
-  std::cout << header_str << " ";
-  std::cout << body_str << " ";
+  std::cout << next_requests_str << " ";
   std::cout << last_activity << " ";
   std::cout << last_cgi_activity << " ";
   std::cout << content_length << " ";

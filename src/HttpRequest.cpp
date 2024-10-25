@@ -1,9 +1,6 @@
 #include "HttpRequest.hpp"
 #include "Base.hpp"
 
-#define CRLF "\r\n"
-#define SP ' '
-
 using std::string, std::stringstream, std::unordered_map;
 
 const std::array<std::string, 2> HttpRequest::allowedHttpVersions = {

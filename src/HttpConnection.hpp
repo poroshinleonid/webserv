@@ -11,6 +11,8 @@
 #include <string>
 #include <vector>
 
+
+
 enum connection_state {
   CON_WAIT,
   CON_CGI_RUNNING,
@@ -22,6 +24,17 @@ enum connection_state {
   CON_SEND_INCOMPL,
   CON_ERR,
   CON_CLOSED,
+};
+
+enum class HttpChunkState {
+  DATA_CHUNK,
+  END_CHUNK,
+  NOT_A_CHUNK,
+};
+
+struct HttpChunk {
+  HttpChunkState state;
+  std::string content;
 };
 
 class HttpConnection {
@@ -37,17 +50,21 @@ public:
 public:
   void update_last_activity();
   void update_last_cgi_activity();
+  HttpChunk parse_http_chunk();
 
+// Add a buffer for extra requests (in case we have a string with several requests)
+// and we eat only one, the others should be saved
+// This value will have to be checked and cleaned at several important places inside the ConnManager
 public:
   int fd;
-  std::stringstream recv_stream;
+  std::string recv_chunk;
   Config *config;
   Logger *logger;
   Server *serv;
   std::string recv_buffer;
   std::string send_buffer;
-  std::string header_str;
-  std::string body_str;
+  HttpChunk chunked_chunk;
+  std::string next_requests_str;
   time_t last_activity;
   time_t last_cgi_activity;
   int content_length;
