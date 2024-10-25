@@ -42,15 +42,18 @@ ConnectionManager::~ConnectionManager() {
   }
 }
 
-
 int ConnectionManager::setup_server(Server &serv, Config &cfg) {
   try {
-    // 1. Choose the port and host of each ’server’.
     serv.srv_sockaddr.sin_family = AF_INET;
-    serv.srv_sockaddr.sin_port = Libft::ft_atoi(cfg["port"].unwrap());
+    std::string port_str = cfg.get_value_safely("listen");
+    if (port_str.empty()) {
+      serv.srv_sockaddr.sin_port = 80;
+    } else {
+      serv.srv_sockaddr.sin_port = Libft::ft_atoi(port_str);
+    }
     serv.srv_sockaddr.sin_addr.s_addr =
         Config::string_to_ip(cfg["host"].unwrap());
-    bzero(serv.srv_sockaddr.sin_zero, 8); // LIBFT: forbidden fun
+    Libft::ft_memset(serv.srv_sockaddr.sin_zero, 8, 0);
     serv.host = serv.srv_sockaddr.sin_addr.s_addr;
     serv.port = serv.srv_sockaddr.sin_port;
 
@@ -63,47 +66,9 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
     //   serv.server_names.push_back(srv_name);
     // }
     serv.server_names = Config::split_string(cfg.get_value_safely("server_name"));
-
-    // 4. Setup default error pages.
-    std::vector<Config> error_pages = cfg.get_vec("default_page");
-    for (size_t i = 0; i < error_pages.size(); i++) {
-      ErrorPage page;
-      page.page_code = Libft::ft_atoi(error_pages[i]["code"].unwrap());
-      page.html_file = error_pages[i]["html_file"].unwrap();
-      page.location = error_pages[i]["location"].unwrap();
-      std::string tmp = error_pages[i].get_value_safely("internal");
-      page.internal =  tmp == "true"|| tmp == "";
-      serv.error_pages.push_back(page);
-    }
-
-    // 5. Limit client body size.
     serv.client_max_body_size = Libft::ft_atoi(cfg.get_value_safely("client_max_body_size"));
     if (serv.client_body_size == 0) {
       serv.client_body_size = Config::client_default_max_body_size;
-    }
-
-    // 6. Setup routes with one or multiple of the following rules/configuration
-    // 1. get_vec routes
-    // 2. for each cfg in vector parse it and push_back the result to
-    // Server.routes (which is a vector);
-    std::vector<Config> routes_vec = cfg.get_vec("route");
-    for (size_t i = 0; i < routes_vec.size(); i++) {
-      Route cur_route;
-      Config &cur_cfg = routes_vec[i];
-      cur_route.location = cur_cfg["location"].unwrap();
-      cur_route.methods =
-          Config::split_string(cur_cfg.get_value_safely("methods"));
-      cur_route.redirection = cur_cfg.get_value_safely("redirection");
-      cur_route.root_dir = cur_cfg.get_value_safely("root_dir");
-      cur_route.index = cur_cfg.get_value_safely("index");
-      cur_route.error_page = cur_cfg.get_value_safely("error_page");
-      cur_route.dir_listing = cur_cfg.get_value_safely("dir_listing") == "true";
-      cur_route.default_file_for_dir_request_path =
-          cur_cfg.get_value_safely("default_file_for_dir_request_path");
-      cur_route.cgi_extension = cur_cfg.get_value_safely("cgi_extension");
-      cur_route.upload_files_route =
-          cur_cfg.get_value_safely("upload_files_route");
-      serv.routes.push_back(cur_route);
     }
     return 0;
   } catch (std::exception &e) {
@@ -114,6 +79,7 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 }
 
 int ConnectionManager::start_server(Server &serv) {
+  // get value safely
   serv.timeout = static_cast<double>(Libft::ft_atoi((*config)["timeout"].unwrap())) / 1000.0;
   serv.cgi_timeout = static_cast<double>(Libft::ft_atoi((*config)["cgi_timeout"].unwrap())) / 1000.0;
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -278,7 +244,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   if (connection.recv_done == true) {
     return false;
   }
-  (*logger).log_error("---------------------------------" + Libft::ft_itos(fd));
+  // (*logger).log_error("--" + Libft::ft_itos(fd));
   if (listen_servers.find(fd) != listen_servers.end()) {
     (*logger).log_info("poll() read on SERVER socket " + Libft::ft_itos(fd));
     handle_accept(fd);
@@ -376,6 +342,7 @@ bool ConnectionManager::handle_poll_write(int fd) {
   }
   int bytes_sent = send(fd, connections[fd].send_buffer.c_str(),
                         connections[fd].send_buffer.length(), 0);
+  logger->log_info("Sent " + Libft::ft_itos(bytes_sent) + " bytes on socket " + Libft::ft_itos(fd));
   connections[fd].update_last_activity();
   if (bytes_sent < 0) {
     logger->log_error("send failed on socket" + Libft::ft_itos(fd));
@@ -513,11 +480,11 @@ void ConnectionManager::shutdown_server(int listen_fd) {
       close_connection(fd_to_remove);
       continue;
     }
-    +it;
+    ++it;
   }
   close(srv->listen_fd);
   for (std::vector<struct pollfd>::iterator it = fds.begin();
-       it != fds.end();+it) {
+       it != fds.end();++it) {
     if (it->fd == listen_fd) {
       fds.erase(it);
       break;
@@ -588,7 +555,7 @@ void ConnectionManager::print_connection_manager() {
 
   std::cout << "listen_servers list:" << std::endl;
   for (std::map<int, Server>::iterator it = listen_servers.begin();
-       it != listen_servers.end(); i++t) {
+       it != listen_servers.end(); ++it) {
     std::cout << "\t{" << it->first << ": \n";
     it->second.print_server();
   }

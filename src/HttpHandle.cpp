@@ -58,7 +58,7 @@ namespace HttpHandle {
 
         bool is_keep_alive = false;
         try {
-            if (request.get_header_at("Connection") == "Keep-Alive") {
+            if (request.get_header_at("Connection") == "keep-alive") {
                 is_keep_alive = true;
             }
         } catch (...) {/*ignore*/}
