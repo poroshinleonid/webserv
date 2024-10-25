@@ -1,6 +1,7 @@
 #include "HttpHandle.hpp"
 #include "HttpRequest.hpp"
 #include "Base.hpp"
+#include "Libft.hpp"
 
 #include <algorithm>
 #include <filesystem>
@@ -55,7 +56,6 @@ namespace HttpHandle {
         try {
             request = HttpRequest(request_str);
         } catch (HttpRequest::BadRequest &) {
-            std::cout << "Throwing 400 in #1: [" << request_str << "]" << std::endl;
             return status_code_to_response(400, config /*dummy*/, false /*default*/);
         } catch (HttpRequest::RequestNotFinished &) {
             return requestNotFinished {.is_chunked_transfer = true};
@@ -204,8 +204,8 @@ namespace HttpHandle {
                 content_name = "text/css";
                 break;
         }
-        std::string response_head = "HTTP/1.1 200 OK\nContent-type: "
-                                    + content_name + "\n\n";
+        std::string response_head = "HTTP/1.1 200 OK\r\nContent-type: "
+                                    + content_name + "\r\n\r\n";
         return response_head;
     }
 
@@ -230,11 +230,17 @@ namespace HttpHandle {
             content_type = ContentType::plain;
         }
 
-        return normalResponse { .response = ok_response_head(content_type) + content, .is_keep_alive = is_keep_alive };
+        std::string response_header_str = ok_response_head(content_type);
+        if (response_header_str.length() >= 2) {
+            response_header_str.resize(response_header_str.length() - 2);
+        }
+        response_header_str.append("Content-Length: " + Libft::ft_itos(content.size()) + "\r\n\r\n");
+
+        return normalResponse { .response = response_header_str + content, .is_keep_alive = is_keep_alive };
     }
 
     response HttpHandle::redirection_response(const std::string& redirection_url, bool is_keep_alive) {
-        return normalResponse { .response = "HTTP/1.1 301 Moved Permanently\n" "location: " + redirection_url  + "\n", .is_keep_alive = is_keep_alive };
+        return normalResponse { .response = "HTTP/1.1 301 Moved Permanently\r\n" "location: " + redirection_url  + "\r\n\r\n", .is_keep_alive = is_keep_alive };
     }
 
     response HttpHandle::directory_listing_response(const fs::path& directory_path, const std::string& url, bool is_keep_alive) {
@@ -446,10 +452,13 @@ namespace HttpHandle {
         const std::string ERROR_MARKER = "$ERROR$";
         error_content.replace(error_content.find(ERROR_MARKER), ERROR_MARKER.size(), error_message);
 
+        std::string content_sz_str = "Content-Length: " + Libft::ft_itos(error_content.size()) + "\r\n";
+
         return normalResponse { .response = "HTTP/1.1 "
-        + error_message + "\n"
-        "Content-type: text/html\n"
-        "\n"
+        + error_message + "\r\n"
+        "Content-type: text/html\r\n" + 
+        content_sz_str + 
+        "\r\n"
         + error_content, .is_keep_alive = is_keep_alive };
     }
 
