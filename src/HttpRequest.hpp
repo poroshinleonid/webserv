@@ -7,6 +7,7 @@
 #include <vector>
 
 #define CRLF "\r\n"
+#define CRLFCRLF "\r\n\r\n"
 #define CHUNKTERM "0\r\n\r\n"
 #define SP ' '
 

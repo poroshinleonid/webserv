@@ -303,6 +303,8 @@ bool ConnectionManager::handle_poll_read(int fd) {
   // Finished recieving, bytes_recvd < recv_chunk_sz
   std::string response_string;
   if (connection.is_chunked_transfer == true) {
+    logger->log_info("RECIEVED A CHUNK OF SIZE " + Libft::ft_itos(bytes_recvd));
+    logger->log_info(connection.recv_chunk);
     if (bytes_recvd == recv_chunk_sz) {
       return true;
     }
@@ -418,6 +420,7 @@ bool ConnectionManager::handle_poll_write(int fd) {
   if (connections[fd].send_buffer.empty()) {
     fds[find_fd_index(fd)].events = POLLIN;
     connections[fd].recv_done = false;
+    connections[fd].is_chunked_transfer = false;
   }
   return true;
 }

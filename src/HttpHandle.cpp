@@ -57,7 +57,9 @@ namespace fs = std::filesystem;
 bool is_request_finished(const std::string &request_str) {
   if (request_str.find("\r\n\r\n") != std::string::npos) {
     if (request_str.find("Content-Length: ") != std::string::npos) {
-      return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 3) != std::string::npos);
+      return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
+    } else if (request_str.find("Transfer-Encoding: chunked\r\n") != std::string::npos) {
+      return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
     } else {
       return true;
     }
@@ -66,7 +68,10 @@ bool is_request_finished(const std::string &request_str) {
 }
 
 bool check_chunked_transfer(const std::string &request_str) {
-  (void)request_str;
+  if (request_str.find("Transfer-Encoding: chunked\r\n") != std::string::npos && \
+      request_str.find(CRLFCRLF) != std::string::npos) {
+    return true;
+  }
   return false;
 }
 
@@ -79,7 +84,8 @@ response HttpHandle::compose_response(const std::string &request_str,
   }
   try {
     request = HttpRequest(request_str);
-  } catch (HttpRequest::BadRequest &) {
+  } catch (HttpRequest::BadRequest &e) {
+    std::cout << "Bad Request: " << e.what() << std::endl;
     return status_code_to_response(400, config /*dummy*/, false /*default*/);
   } catch (HttpRequest::RequestNotFinished &) {
     return requestNotFinished{.is_chunked_transfer = true};
