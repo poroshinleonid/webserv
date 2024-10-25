@@ -64,39 +64,39 @@ HttpRequest::HttpRequest(const string &s) {
     return;
   }
   std::string body;
-  // if (headers_.find("Transfer-Encoding") != headers_.end() &&
-  //     headers_.at("Transfer-Encoding") == "chunked") {
-  //   while (true) {
-  //     std::string chunk_size_line;
-  //     if (!getline_str(stream, chunk_size_line, CRLF)) {
-  //       throw RequestNotFinished("Not finished chunked request");
-  //     }
-  //     int chunk_size;
-  //     try {
-  //       size_t pos;
-  //       chunk_size = std::stoi(chunk_size_line, &pos);
-  //       if (pos != chunk_size_line.size()) {
-  //         std::cout << "chunk_line_size = " << chunk_size_line;
-  //         std::cout << "; chunk_size = " << chunk_size;
-  //         std::cout << "; pos = " << pos << std::endl;
-  //         throw std::invalid_argument("The whole string should be a number");
-  //       }
-  //     } catch (std::invalid_argument &) {
-  //       throw BadRequest("Expected an integer as a chunk size");
-  //     }
-  //     if (chunk_size == 0) {
-  //       body_ = body;
-  //       return;
-  //     }
-  //     for (int i = 0; i < chunk_size; i++) {
-  //       char c;
-  //       if (!stream.get(c)) {
-  //         throw BadRequest("Chunk size was too short");
-  //       }
-  //       body += c;
-  //     }
-  //   }
-  // }
+  if (headers_.find("Transfer-Encoding") != headers_.end() &&
+      headers_.at("Transfer-Encoding") == "chunked") {
+    while (true) {
+      std::string chunk_size_line;
+      if (!getline_str(stream, chunk_size_line, CRLF)) {
+        throw RequestNotFinished("Not finished chunked request");
+      }
+      int chunk_size;
+      try {
+        size_t pos;
+        chunk_size = std::stoi(chunk_size_line, &pos);
+        if (pos != chunk_size_line.size()) {
+          std::cout << "chunk_line_size = " << chunk_size_line;
+          std::cout << "; chunk_size = " << chunk_size;
+          std::cout << "; pos = " << pos << std::endl;
+          throw std::invalid_argument("The whole string should be a number");
+        }
+      } catch (std::invalid_argument &) {
+        throw BadRequest("Expected an integer as a chunk size");
+      }
+      if (chunk_size == 0) {
+        body_ = body;
+        return;
+      }
+      for (int i = 0; i < chunk_size; i++) {
+        char c;
+        if (!stream.get(c)) {
+          throw BadRequest("Chunk size was too short");
+        }
+        body += c;
+      }
+    }
+  }
   while (getline_str(stream, line, CRLF)) {
     if (line == "") {
       break;

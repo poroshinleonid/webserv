@@ -297,40 +297,40 @@ bool ConnectionManager::handle_poll_read(int fd) {
   }
   logger->log_info("Socket " + Libft::ft_itos(fd) + ": Recieved " +
                    Libft::ft_itos(bytes_recvd) + " bytes");
-  connection.recv_chunk.append(bufg);
+  connection.recv_buffer.append(bufg);
 
-  // Finished recieving, bytes_recvd < recv_chunk_sz
   std::string response_string;
-  if (connection.is_chunked_transfer == true) {
-    logger->log_info("RECIEVED A CHUNK OF SIZE " + Libft::ft_itos(bytes_recvd));
-    logger->log_info(connection.recv_chunk);
-    if (bytes_recvd == recv_chunk_sz) {
-      return true;
-    }
-    HttpChunk chunk = connection.parse_http_chunk();
-    switch (chunk.state) {
-    case HttpChunkState::END_CHUNK:
-      connection.recv_buffer.append(chunk.content);
-      response_string = get_responses_string(connection);
-      break;
-    case HttpChunkState::DATA_CHUNK:
-      std::cout << "DATA_CHUNK" << std::endl;
-      connection.recv_buffer.append(chunk.content);
-      break;
-    case HttpChunkState::NOT_A_CHUNK:
-    default:
-      break;
-    }
-  } else {
-  // Recieved as many bytes as the buffer has = not the whole request is read
-  connection.recv_buffer.append(connection.recv_chunk);
-  connection.recv_chunk.clear();
-  if (bytes_recvd == recv_chunk_sz) {
-    return true;
-  }
-    response_string = get_responses_string(connection);
-  }
+  // if (connection.is_chunked_transfer == true) {
+  //   logger->log_info("RECIEVED A CHUNK OF SIZE " + Libft::ft_itos(bytes_recvd));
+  //   logger->log_info(connection.recv_chunk);
+  //   if (bytes_recvd == recv_chunk_sz) {
+  //     return true;
+  //   }
+  //   HttpChunk chunk = connection.parse_http_chunk();
+  //   switch (chunk.state) {
+  //   case HttpChunkState::END_CHUNK:
+  //     connection.recv_buffer.append(chunk.content);
+  //     response_string = get_responses_string(connection);
+  //     break;
+  //   case HttpChunkState::DATA_CHUNK:
+  //     std::cout << "DATA_CHUNK" << std::endl;
+  //     connection.recv_buffer.append(chunk.content);
+  //     break;
+  //   case HttpChunkState::NOT_A_CHUNK:
+  //   default:
+  //     break;
+  //   }
+  // } else {
+  // // Recieved as many bytes as the buffer has = not the whole request is read
+  // connection.recv_buffer.append(connection.recv_chunk);
+  // connection.recv_chunk.clear();
+  // if (bytes_recvd == recv_chunk_sz) {
+  //   return true;
+  // }
+  //   response_string = get_responses_string(connection);
+  // }
 
+  response_string = get_responses_string(connection);
   // this means not the whole request was recv()-d
   if (response_string.empty() && connection.is_cgi_running == false) {
     return true;
