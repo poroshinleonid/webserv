@@ -1,20 +1,20 @@
 #include "ConnectionManager.hpp"
+#include "Base.hpp"
 #include "Config.hpp"
 #include "HttpConnection.hpp"
-#include "Server.hpp"
 #include "HttpHandle.hpp"
 #include "HttpRequest.hpp"
-#include "Base.hpp"
 #include "Libft.hpp"
+#include "Server.hpp"
 
 #include <algorithm>
 #include <cstring>
+#include <future>
 #include <iostream>
 #include <map>
 #include <sstream>
-#include <vector>
-#include <future>
 #include <thread>
+#include <vector>
 
 #include <arpa/inet.h>
 #include <ctime>
@@ -28,7 +28,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#define recv_chunk_sz 4000
+#define recv_chunk_sz 32768
 
 bool sig_stop = false;
 
@@ -67,14 +67,17 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
     // srv_name) {
     //   serv.server_names.push_back(srv_name);
     // }
-    serv.server_names = Config::split_string(cfg.get_value_safely("server_name"));
-    serv.client_max_body_size = Libft::ft_atoi(cfg.get_value_safely("client_max_body_size"));
+    serv.server_names =
+        Config::split_string(cfg.get_value_safely("server_name"));
+    serv.client_max_body_size =
+        Libft::ft_atoi(cfg.get_value_safely("client_max_body_size"));
     if (serv.client_body_size == 0) {
       serv.client_body_size = Config::client_default_max_body_size;
     }
     return 0;
   } catch (std::exception &e) {
-    logger->log_error("Can't setup one of the servers: " + static_cast<std::string>(e.what()));
+    logger->log_error("Can't setup one of the servers: " +
+                      static_cast<std::string>(e.what()));
     return (-1);
   };
   return 0;
@@ -82,8 +85,12 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 
 int ConnectionManager::start_server(Server &serv) {
   // get value safely
-  serv.timeout = static_cast<double>(Libft::ft_atoi((*config)["timeout"].unwrap())) / 1000.0;
-  serv.cgi_timeout = static_cast<double>(Libft::ft_atoi((*config)["cgi_timeout"].unwrap())) / 1000.0;
+  serv.timeout =
+      static_cast<double>(Libft::ft_atoi((*config)["timeout"].unwrap())) /
+      1000.0;
+  serv.cgi_timeout =
+      static_cast<double>(Libft::ft_atoi((*config)["cgi_timeout"].unwrap())) /
+      1000.0;
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (new_listen_fd < 0) {
     std::string error = "socket(): can't create socket " + serv.host + ":" +
@@ -93,15 +100,15 @@ int ConnectionManager::start_server(Server &serv) {
   }
   struct sockaddr_in server_addr_in;
   server_addr_in.sin_family = serv.srv_sockaddr.sin_family;
-  server_addr_in.sin_addr.s_addr =
-      htonl(serv.srv_sockaddr.sin_addr.s_addr);
+  server_addr_in.sin_addr.s_addr = htonl(serv.srv_sockaddr.sin_addr.s_addr);
   server_addr_in.sin_port = htons(serv.port);
   memset(&(server_addr_in.sin_zero), '\0', 8); // LIBFT bzero
   int opt = 1;
   if (setsockopt(new_listen_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) <
       0) {
-    std::string error = "setsockopt(): can't assign address to socket" + serv.host + ":" +
-                        Libft::ft_itos(serv.port) + " : " + strerror(errno);
+    std::string error = "setsockopt(): can't assign address to socket" +
+                        serv.host + ":" + Libft::ft_itos(serv.port) + " : " +
+                        strerror(errno);
     logger->log_error(error);
     close(new_listen_fd);
     return (-1);
@@ -122,8 +129,8 @@ int ConnectionManager::start_server(Server &serv) {
     close(new_listen_fd);
     return (-1);
   }
-  std::string status_message =
-      "Server " + serv.host + ":" + Libft::ft_itos(serv.port) + " is listening!";
+  std::string status_message = "Server " + serv.host + ":" +
+                               Libft::ft_itos(serv.port) + " is listening!";
   logger->log_info(status_message);
   serv.listen_fd = new_listen_fd;
   listen_servers[serv.listen_fd] = serv;
@@ -166,9 +173,10 @@ int ConnectionManager::run() {
     return 1;
   }
   while (!sig_stop) {
-    int poll_result = poll(fds.data(), fds.size(), 10); // REVISE:timeout from cfg?
+    int poll_result =
+        poll(fds.data(), fds.size(), 10); // REVISE:timeout from cfg?
     if (poll_result == -1) {
-      return handle_poll_error(errno); //REVISE where is terminate()?
+      return handle_poll_error(errno); // REVISE where is terminate()?
     }
     if (poll_result == 0) {
       continue;
@@ -182,7 +190,7 @@ int ConnectionManager::run() {
 }
 
 int ConnectionManager::cleanup(int fd) {
-(void)fd;
+  (void)fd;
   // if (connections[fd].is_cgi_running && cgi_timed_out(fd)) {
   //   timeout_cgi(fd);
   //   return 0;
@@ -216,10 +224,11 @@ int ConnectionManager::handle_fds() {
 
 void ConnectionManager::handle_revent_problem(int fd) {
   if (fds[find_fd_index(fd)].revents & POLLHUP) {
-    logger->log_error("Socket " + Libft::ft_itos(fd) + " hung up incorrectly (POLLHUP).");
-  } else 
-  if (fds[find_fd_index(fd)].revents & POLLNVAL) {
-    logger->log_error("Socket " + Libft::ft_itos(fd) + " is closed unexpectedly (POLLINVAL).");
+    logger->log_error("Socket " + Libft::ft_itos(fd) +
+                      " hung up incorrectly (POLLHUP).");
+  } else if (fds[find_fd_index(fd)].revents & POLLNVAL) {
+    logger->log_error("Socket " + Libft::ft_itos(fd) +
+                      " is closed unexpectedly (POLLINVAL).");
     connections[fd].socket_closed = true;
   } else if (fds[find_fd_index(fd)].revents & POLLERR) {
     logger->log_error("Socket " + Libft::ft_itos(fd) + " failed (POLLERR).");
@@ -241,9 +250,9 @@ bool ConnectionManager::handle_poll_read(int fd) {
     return true;
   }
   HttpConnection &connection = connections[fd];
-  // if cgi is still running, stop recv()ing from this socket until cgi is either finished or timed out
+  // if cgi is still running, stop recv()ing from this socket until cgi is
+  // either finished or timed out
   if (connection.is_cgi_running) {
-    fds[find_fd_index(fd)].events &= ~POLLIN;
     if (cgi_timed_out(fd)) {
       timeout_and_kill_cgi(fd);
     }
@@ -251,12 +260,16 @@ bool ConnectionManager::handle_poll_read(int fd) {
   }
   // This should not ever happen
   if (connection.recv_done == true) {
-    logger->log_info("Socket " + Libft::ft_itos(fd) + ": there's something to read according to poll(), but recv_done=true which means that the previous request wasn't responede yet");
+    logger->log_info(
+        "Socket " + Libft::ft_itos(fd) +
+        ": there's something to read according to poll(), but recv_done=true "
+        "which means that the previous request wasn't responed yet");
+        
     return false;
   }
 
-
-  char bufg[4001];
+  char bufg[recv_chunk_sz + 1];
+  Libft::ft_memset(bufg, recv_chunk_sz + 1, 0);
   int bytes_recvd = recv(fd, bufg, recv_chunk_sz, 0);
   connection.update_last_activity();
   // No bytes recieved = cliend hangs up gracefully.
@@ -264,13 +277,14 @@ bool ConnectionManager::handle_poll_read(int fd) {
     if (connection.is_keep_alive == false) {
       logger->log_info("Socket " + Libft::ft_itos(fd) + " hung up gracefully.");
       close_connection(fd);
-    }
-    if (connection.is_cgi_running == false) {
-      logger->log_info("Socket " + Libft::ft_itos(fd) + " hung up gracefully, although it is keep-alive");
+    } else if (connection.is_cgi_running == false) {
+      logger->log_info("Socket " + Libft::ft_itos(fd) +
+                       " hung up gracefully, although it is keep-alive");
       close_connection(fd);
     } else {
-    logger->log_info("Socket " + Libft::ft_itos(fd) + " sent 0 bytes but my CGI is still running.");
-    fds[find_fd_index(fd)].events &= POLLOUT;
+      logger->log_info("Socket " + Libft::ft_itos(fd) +
+                       " sent 0 bytes but my CGI is still running.");
+      fds[find_fd_index(fd)].events &= POLLOUT;
     }
     return true;
   }
@@ -281,24 +295,29 @@ bool ConnectionManager::handle_poll_read(int fd) {
     close_connection(fd);
     return true;
   }
-  // Recieved as many bytes as the buffer has = not the whole request is read yet
+  // Recieved as many bytes as the buffer has = not the whole request is read
+  // yet
   if (bytes_recvd == recv_chunk_sz) {
     connection.recv_stream << bufg;
     return true;
   }
 
   // Finished recieving, bytes_recvd < recv_chunk_sz
-  logger->log_info("Socket " + Libft::ft_itos(fd) + ": Recieved " + Libft::ft_itos(bytes_recvd) + " bytes");
-  connection.recv_done = true;
-  fds[find_fd_index(fd)].events &= ~POLLIN;
-  fds[find_fd_index(fd)].events |= POLLOUT;
+  logger->log_info("Socket " + Libft::ft_itos(fd) + ": Recieved " +
+                   Libft::ft_itos(bytes_recvd) + " bytes");
   connection.recv_stream << bufg;
   std::string response_string = get_responses_string(connection);
+  // this means not the whole request was recv()-d
+  if (response_string.empty() && connection.is_cgi_running == false) {
+    return true;
+  }
+  connection.recv_done = true;
+  fds[find_fd_index(fd)].events = POLLOUT;
   if (response_string.empty() && connection.is_cgi_running == true) {
-    struct pollfd new_pollfd_struct = {connection.cgi_pipe[1], POLLIN,
-                                       0};
+    struct pollfd new_pollfd_struct = {connection.cgi_pipe[0], POLLIN, 0};
     fds.push_back(new_pollfd_struct);
     pipe_to_socket[connection.cgi_pipe[0]] = fd;
+    std::cerr << "CGI PIPE ON FD " << Libft::ft_itos(connection.cgi_pipe[0]) << ", Socket: " << fd << std::endl;
   }
   connection.send_buffer.append(response_string);
   return true;
@@ -315,20 +334,23 @@ void ConnectionManager::handle_accept(int fd) {
     return;
   }
   if (setsockopt(new_fd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(int)) < 0) {
-    logger->log_error("Socket " + Libft::ft_itos(new_fd) + "Failed to set SO_REUSEADDR");
+    logger->log_error("Socket " + Libft::ft_itos(new_fd) +
+                      "Failed to set SO_REUSEADDR");
     return;
   }
   if (setsockopt(new_fd, SOL_SOCKET, SO_KEEPALIVE, &optval, sizeof(int)) < 0) {
-    logger->log_error("Socket " + Libft::ft_itos(new_fd) + "Failed to set SO_KEEPALIVE");
+    logger->log_error("Socket " + Libft::ft_itos(new_fd) +
+                      "Failed to set SO_KEEPALIVE");
     return;
   }
-  logger->log_info("Socket " + Libft::ft_itos(fd) + ": Accepted new connection " + Libft::ft_itos(new_fd));
+  logger->log_info("Socket " + Libft::ft_itos(fd) +
+                   ": Accepted new connection " + Libft::ft_itos(new_fd));
 
   struct pollfd new_pollfd_struct;
   new_pollfd_struct.fd = new_fd;
   new_pollfd_struct.events = POLLIN;
   fds.push_back(new_pollfd_struct);
-  HttpConnection connection(config, &listen_servers[fd]);
+  HttpConnection connection(config, logger, &listen_servers[fd]);
   connection.fd = new_fd;
   connections[new_fd] = connection;
   connection.update_last_activity();
@@ -345,18 +367,21 @@ bool ConnectionManager::handle_poll_write(int fd) {
   if (connections[fd].is_cgi_running) {
     if (cgi_timed_out(fd)) {
       timeout_and_kill_cgi(fd);
+      fds[find_fd_index(fd)].events = POLLIN;
     }
-    fds[find_fd_index(fd)].events = POLLIN;
     return false;
   }
-  //We have nothing to send. Should not happen ever.
+  // We have nothing to send. Should not happen ever.
   if (connections[fd].send_buffer.empty()) {
-    logger->log_error("Something wrong, this shouldn't happen. Nothing to send but poll() searched for pollout");
+    logger->log_error("Something wrong, this shouldn't happen. Nothing to send "
+                      "but poll() searched for pollout");
+    fds[find_fd_index(fd)].events = 0;
     return false;
   }
   int bytes_sent = send(fd, connections[fd].send_buffer.c_str(),
                         connections[fd].send_buffer.length(), 0);
-  std::cout << "Normal response sent: " << connections[fd].send_buffer << std::endl;
+  std::cout << "Normal response sent: " << connections[fd].send_buffer
+            << std::endl;
   connections[fd].update_last_activity();
   // bytes_sent < 0 means error
   if (bytes_sent < 0) {
@@ -364,9 +389,10 @@ bool ConnectionManager::handle_poll_write(int fd) {
     close_connection(fd);
     return true;
   }
-  logger->log_info("Socket " + Libft::ft_itos(fd) + ": Sent " + Libft::ft_itos(bytes_sent) + " bytes");
+  logger->log_info("Socket " + Libft::ft_itos(fd) + ": Sent " +
+                   Libft::ft_itos(bytes_sent) + " bytes");
   connections[fd].send_buffer.erase(0, bytes_sent);
-  //If we sent everything we needed, we are ready to recieve again
+  // If we sent everything we needed, we are ready to recieve again
   if (connections[fd].send_buffer.empty()) {
     fds[find_fd_index(fd)].events = POLLIN;
     connections[fd].recv_done = false;
@@ -383,10 +409,12 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
     if (connection.cgi_result == 0) {
       return false;
     }
-    //waitpid returned not cgi pid - should hever happen
+    // waitpid returned not cgi pid - should hever happen
     if (connection.cgi_result != connection.cgi_pid) {
       kill_cgi(connection.fd);
-      logger->log_error("Socket " + Libft::ft_itos(connection.fd) + ": Waitpid returned garbage pid from cgi pipe #" + Libft::ft_itos(connection.fd));
+      logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
+                        ": Waitpid returned garbage pid from cgi pipe #" +
+                        Libft::ft_itos(connection.fd));
       return false;
     }
     if (!WIFEXITED(status_code)) {
@@ -397,16 +425,18 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
       connection.is_response_ready = true;
       return false;
     }
-    //We are here if the cgi finished gracefully so we can read from its pipe
+    // We are here if the cgi finished gracefully so we can read from its pipe
     connection.cgi_finished = true;
   }
   return read_cgi_pipe(connection);
 }
 
-//assumes poll() said we can read from the pipe!
+// assumes poll() said we can read from the pipe!
 bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   int buf_len = sizeof(cgi_buffer);
-  logger->log_info("Socket " + Libft::ft_itos(connection.fd) + ": reading CGI pipe " + Libft::ft_itos(connection.cgi_pipe[0]));
+  logger->log_info("Socket " + Libft::ft_itos(connection.fd) +
+                   ": reading CGI pipe " +
+                   Libft::ft_itos(connection.cgi_pipe[0]));
   Libft::ft_memset(cgi_buffer, buf_len, 0);
   int bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len);
   connection.update_last_cgi_activity();
@@ -414,7 +444,9 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   Libft::ft_memset(cgi_buffer, buf_len, 0);
   // FIX: INTERNAL SERVER ERROR should be a complete valid response.
   if (bytes_read < 0) {
-    logger->log_error("Socket " + Libft::ft_itos(connection.fd) + ": read() failed on CGI pipe " + Libft::ft_itos(connection.cgi_pipe[0]));
+    logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
+                      ": read() failed on CGI pipe " +
+                      Libft::ft_itos(connection.cgi_pipe[0]));
     connection.send_buffer = "INTERNAL SERVER ERROR";
     connection.is_response_ready = true;
     kill_cgi(connection.fd);
@@ -435,9 +467,10 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
 /*------------ UTILS ----------------*/
 
 /**
- * @brief takes connection and correctly closes it, closes the sockets and pipes etc
- * 
- * @param fd 
+ * @brief takes connection and correctly closes it, closes the sockets and pipes
+ * etc
+ *
+ * @param fd
  */
 void ConnectionManager::close_connection(int fd) {
   if (connections[fd].socket_closed == false) {
@@ -446,8 +479,8 @@ void ConnectionManager::close_connection(int fd) {
   if (connections[fd].is_cgi_running == true) {
     kill_cgi(fd);
   }
-  for (std::vector<struct pollfd>::iterator it = fds.begin();
-       it != fds.end();++it) {
+  for (std::vector<struct pollfd>::iterator it = fds.begin(); it != fds.end();
+       ++it) {
     if (it->fd == fd) {
       fds.erase(it);
       break;
@@ -492,7 +525,6 @@ void ConnectionManager::timeout_and_kill_cgi(int connection_fd) {
   connections[connection_fd].is_cgi_running = false;
   connections[connection_fd].is_response_ready = true;
 }
-
 
 void ConnectionManager::shutdown_server(int listen_fd) {
   Server *srv = &(listen_servers[listen_fd]);
@@ -549,18 +581,17 @@ int ConnectionManager::find_fd_index(int system_fd) {
       return i;
     }
   }
-  throw std::out_of_range("The pollfd struct with the sought-after ->fd is not found");
+  throw std::out_of_range(
+      "The pollfd struct with the sought-after ->fd is not found");
 }
-
-
 
 #define DEBUG
 
-# ifndef DEBUG
+#ifndef DEBUG
 void ConnectionManager::print_connection_manager() {}
-# endif
+#endif
 
-# ifdef DEBUG
+#ifdef DEBUG
 void ConnectionManager::print_connection_manager() {
   std::cout << "====\n====\n====\n";
   std::cout << (*config).get_content() << std::endl;
@@ -599,4 +630,4 @@ void ConnectionManager::print_connection_manager() {
   std::cout << std::endl;
   std::cout << "====\n====\n====\n";
 }
-# endif
+#endif
