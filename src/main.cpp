@@ -7,9 +7,7 @@
 #include <string>
 #include <vector>
 
-
 #define DEBUG
-
 
 int main(int argc, char **argv) {
   setvbuf(stdout, NULL, _IONBF, 0); // cout no buffer

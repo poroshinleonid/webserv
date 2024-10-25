@@ -1,28 +1,23 @@
 #include "Libft.hpp"
 #include "Config.hpp"
 
+#include <cstdlib>
 #include <sstream>
 #include <string>
-#include <cstdlib>
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-
 Libft::Libft() {}
 
-Libft::Libft(Libft const &other) {
-  (void)other;
-};
+Libft::Libft(Libft const &other) { (void)other; };
 
 Libft::~Libft() {}
 
-Libft	&Libft::operator=(const Libft &other) {
+Libft &Libft::operator=(const Libft &other) {
   (void)other;
   return (*this);
 }
-
-
 
 int Libft::ft_atoi(const std::string &s) {
   return static_cast<int>(std::strtod(s.c_str(), NULL));
