@@ -113,7 +113,7 @@ HttpChunk HttpConnection::parse_http_chunk() {
     return chunk;
   }
   do {
-    size_t hex_end_pos = data.find(CRLF);
+    size_t hex_end_pos = data.find(CRLFCRLF);
     if (hex_end_pos == std::string::npos) {
       break;
     }
@@ -128,7 +128,7 @@ HttpChunk HttpConnection::parse_http_chunk() {
       break;
     }
     data.erase(0, hex_end_pos + 2);
-    if (data.find(CRLF) != chunk_size) {
+    if (data.find(CRLFCRLF) != chunk_size) {
       break;
     }
     chunk.content = data.substr(0, chunk_size);

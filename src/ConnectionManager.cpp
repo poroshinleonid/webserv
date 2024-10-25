@@ -299,7 +299,6 @@ bool ConnectionManager::handle_poll_read(int fd) {
                    Libft::ft_itos(bytes_recvd) + " bytes");
   connection.recv_chunk.append(bufg);
 
-
   // Finished recieving, bytes_recvd < recv_chunk_sz
   std::string response_string;
   if (connection.is_chunked_transfer == true) {
@@ -315,6 +314,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
       response_string = get_responses_string(connection);
       break;
     case HttpChunkState::DATA_CHUNK:
+      std::cout << "DATA_CHUNK" << std::endl;
       connection.recv_buffer.append(chunk.content);
       break;
     case HttpChunkState::NOT_A_CHUNK:
