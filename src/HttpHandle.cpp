@@ -20,6 +20,7 @@ std::string get_responses_string(HttpConnection &connection) {
     connection.recv_stream.str(std::string());
     connection.is_response_ready = true;
     connection.is_keep_alive = resp.is_keep_alive;
+    // std::cout << "Normal response: " << resp.response << std::endl;
     return resp.response;
   } catch (std::bad_variant_access &) {/*ignore*/}
   try {
@@ -27,14 +28,17 @@ std::string get_responses_string(HttpConnection &connection) {
     connection.recv_stream.str(std::string());
     connection.is_keep_alive = resp.is_keep_alive;
     connection.is_cgi_running = true;
+    connection.cgi_finished = false;
     connection.cgi_pid = resp.cgi_pid;
     connection.cgi_pipe[0] = resp.cgi_pipe[0];
     connection.cgi_pipe[1] = resp.cgi_pipe[1];
+    std::cout << "CGI response" << std::endl;
     return "";
   } catch (std::bad_variant_access &) {/*ignore*/}
   try {
     auto resp = std::get<HttpHandle::requestNotFinished>(response);
     connection.is_chunked_transfer = resp.is_chunked_transfer;
+    std::cout << "Not finished response" << std::endl;
     return "";
   } catch (std::bad_variant_access &) {
     std::cerr << "You wouldn't have such problem in rust\n";
@@ -51,6 +55,7 @@ namespace HttpHandle {
         try {
             request = HttpRequest(request_str);
         } catch (HttpRequest::BadRequest &) {
+            std::cout << "Throwing 400 in #1: [" << request_str << "]" << std::endl;
             return status_code_to_response(400, config /*dummy*/, false /*default*/);
         } catch (HttpRequest::RequestNotFinished &) {
             return requestNotFinished {.is_chunked_transfer = true};

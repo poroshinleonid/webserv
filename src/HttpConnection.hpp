@@ -50,7 +50,6 @@ public:
   time_t last_activity;
   time_t last_cgi_activity;
   int content_length;
-  bool busy;
   bool is_connected;
   bool is_cgi_running;
   std::string cgi_response;

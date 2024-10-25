@@ -197,7 +197,7 @@ private:
    * 
    * @param connection_fd
    */
-  void timeout_cgi(int connection_fd);
+  void timeout_and_kill_cgi(int connection_fd);
 
   /**
    * @brief shutdown Server instance

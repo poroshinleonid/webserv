@@ -23,11 +23,11 @@ int main(int argc, char **argv) {
   ConnectionManager main_connection(&config, &logger);
   main_connection.setup();
   main_connection.print_connection_manager();
-  std::cout << "Running server" << std::endl;
+  std::cout << "Running the webserv" << std::endl;
   if (main_connection.run() == -1) {
-    std::cout << "server died in a horrible way";
+    std::cout << "Webserv died in a horrible way" << std::endl;
     return 1;
   }
-  std::cout << "server was shut down correctly";
+  std::cout << "Webserv has been shut down correctly" << std::endl;
   return (0);
 }
