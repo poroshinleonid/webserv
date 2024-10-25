@@ -2,6 +2,7 @@
 #define HTTPCONNECTION_HPP
 
 #include "Config.hpp"
+#include "Logger.hpp"
 #include "Server.hpp"
 
 #include <iostream>
@@ -31,8 +32,7 @@ public:
   HttpConnection &operator=(const HttpConnection &obj);
 
 public:
-  HttpConnection(Config *cfg, Server *srv);
-  // HttpConnection(int fd, Server &scfg, Config &cfg);
+  HttpConnection(Config *cfg, Logger *log, Server *srv);
 
 public:
   void update_last_activity();
@@ -42,6 +42,7 @@ public:
   int fd;
   std::stringstream recv_stream;
   Config *config;
+  Logger *logger;
   Server *serv;
   std::string recv_buffer;
   std::string send_buffer;

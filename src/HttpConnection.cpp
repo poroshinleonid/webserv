@@ -1,14 +1,20 @@
 #include "HttpConnection.hpp"
+#include "Logger.hpp"
 #include "Server.hpp"
 
 #include <ctime>
 #include <unistd.h>
 
 HttpConnection::HttpConnection()
-    : fd(0), config(NULL), serv(NULL), last_activity(0), last_cgi_activity(0), content_length(-1), is_connected(false), is_cgi_running(false), cgi_finished(false), cgi_result(false), socket_closed(false), is_response_ready(false), is_keep_alive(false), header_is_parsed(false), body_is_read(false), cgi_pid(0), is_chunked_transfer(false), recv_done(false) {
-    cgi_pipe[0] = 0;
-    cgi_pipe[1] = 0;
-    }
+    : fd(0), config(NULL), logger(NULL), serv(NULL), last_activity(0),
+      last_cgi_activity(0), content_length(-1), is_connected(false),
+      is_cgi_running(false), cgi_finished(false), cgi_result(false),
+      socket_closed(false), is_response_ready(false), is_keep_alive(false),
+      header_is_parsed(false), body_is_read(false), cgi_pid(0),
+      is_chunked_transfer(false), recv_done(false) {
+  cgi_pipe[0] = 0;
+  cgi_pipe[1] = 0;
+}
 
 HttpConnection::~HttpConnection() {
   // if (cgi_pipe[0] != 0){
@@ -19,42 +25,29 @@ HttpConnection::~HttpConnection() {
   // }
 }
 
-HttpConnection::HttpConnection(Config *cfg, Server *srv)
-    : fd(0), config(cfg), serv(srv),  last_activity(0), last_cgi_activity(0), content_length(-1), is_connected(false), is_cgi_running(false), cgi_finished(false), cgi_result(false), socket_closed(false), is_response_ready(false), is_keep_alive(false), header_is_parsed(false), body_is_read(false), cgi_pid(0), is_chunked_transfer(false), recv_done(false) {
+HttpConnection::HttpConnection(Config *cfg, Logger *log, Server *srv)
+    : fd(0), config(cfg), logger(log), serv(srv), last_activity(0),
+      last_cgi_activity(0), content_length(-1), is_connected(false),
+      is_cgi_running(false), cgi_finished(false), cgi_result(false),
+      socket_closed(false), is_response_ready(false), is_keep_alive(false),
+      header_is_parsed(false), body_is_read(false), cgi_pid(0),
+      is_chunked_transfer(false), recv_done(false) {
   (void)cfg;
   (void)srv;
   cgi_pipe[0] = 0;
   cgi_pipe[1] = 0;
 }
 
-//  HttpConnection::HttpConnection(int fd, Server *serv, Config *cfg)  :
-//      fd(fd), config(cfg), serv(serv),
-//      recv_buffer(""), send_buffer(""),
-//      header_str(""), body_str(""), content_length(0),
-//      is_cgi_running(false),
-//      cgi_response(""),
-//      cgi_finished(false), socket_closed(false),
-//      is_response_ready(false),
-//      is_keep_alive(false), header_is_parsed(false),
-//      body_is_read(false), cgi_pid(0) {
-//      last_activity = std::time(&last_activity);
-//      (void)fd;
-//      (void)serv;
-//      // config = cfg;
-//      cgi_pipe[0] = 0;
-//      cgi_pipe[1] = 0;
-//  }
-
 HttpConnection::HttpConnection(HttpConnection const &other)
-    : fd(other.fd), config(other.config), serv(other.serv),
-      recv_buffer(other.recv_buffer), send_buffer(other.send_buffer),
-      header_str(other.header_str), body_str(other.body_str),
-      last_activity(other.last_activity),
+    : fd(other.fd), config(other.config), logger(other.logger),
+      serv(other.serv), recv_buffer(other.recv_buffer),
+      send_buffer(other.send_buffer), header_str(other.header_str),
+      body_str(other.body_str), last_activity(other.last_activity),
       last_cgi_activity(other.last_cgi_activity),
-      content_length(other.content_length),
-      is_connected(other.is_connected), is_cgi_running(other.is_cgi_running),
-      cgi_response(other.cgi_response), cgi_finished(other.cgi_finished),
-      cgi_result(other.cgi_result), socket_closed(other.socket_closed),
+      content_length(other.content_length), is_connected(other.is_connected),
+      is_cgi_running(other.is_cgi_running), cgi_response(other.cgi_response),
+      cgi_finished(other.cgi_finished), cgi_result(other.cgi_result),
+      socket_closed(other.socket_closed),
       is_response_ready(other.is_response_ready),
       is_keep_alive(other.is_keep_alive),
       header_is_parsed(other.header_is_parsed),
@@ -71,6 +64,7 @@ HttpConnection &HttpConnection::operator=(const HttpConnection &other) {
   }
   fd = other.fd;
   config = other.config;
+  logger = other.logger;
   serv = other.serv;
   recv_buffer = other.recv_buffer;
   send_buffer = other.send_buffer;
