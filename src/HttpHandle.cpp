@@ -188,14 +188,18 @@ response HttpHandle::compose_response(const std::string &request_str,
     std::cerr << "Error: couldn't read " << object_path << "\n";
     return status_code_to_response(404, server_config, is_keep_alive);
   }
-  const std::string cgi_extension = ".py";
+  const std::string cgi_extension = ".bla";
   try {
     if (path.extension() == cgi_extension) {
+      // prep_env(request);
+      std::cout << "Sending to CGI: " << request.get_body() << std::endl;
+      object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
       if (request.get_method() == HttpRequest::Method::POST) {
-        return execute_cgi_response(object_path, request.get_body(),
+        return execute_cgi_response(object_path, request,
                                     is_keep_alive);
       } else {
-        return execute_cgi_response(object_path, "", is_keep_alive);
+        return execute_cgi_response(object_path, request, is_keep_alive);
+        // return execute_cgi_response(object_path, "", is_keep_alive);
       }
     }
   } catch (std::runtime_error &e) {
@@ -298,41 +302,88 @@ response HttpHandle::no_directory_listing_response(
 }
 
 response HttpHandle::execute_cgi_response(const std::string &script_path,
-                                          const std::string &arg,
+                                          HttpRequest &request,
                                           bool is_keep_alive) {
-  int fd[2];
-  if (pipe(fd) == -1) {
+  std::string arg = request.get_body();
+  int recv_pipe[2];
+  int send_pipe[2];
+  if (pipe(recv_pipe) == -1) {
     std::cerr << "Pipe error\n";
     throw std::runtime_error("Pipe error");
   }
+  if (pipe(send_pipe) == -1) {
+    std::cerr << "Pipe error\n";
+    throw std::runtime_error("Pipe error");
+  }
+  std::cout << "FORK" << std::endl;
   int pid_t = fork();
   if (pid_t == -1) {
     throw std::runtime_error("Fork error");
   }
   if (pid_t == 0) {
-    close(fd[0]);
-    if (dup2(fd[1], STDOUT_FILENO) == -1) {
+    close(recv_pipe[0]);
+    if (dup2(recv_pipe[1], STDOUT_FILENO) == -1) {
       std::cerr << "dup2 error\n";
-      close(fd[1]);
+      close(recv_pipe[1]);
       exit(1);
     }
-    close(fd[1]);
+    close(recv_pipe[1]);
+    if (dup2(send_pipe[0], STDIN_FILENO) == -1) {
+      std::cerr << "dup2 error\n";
+      close(send_pipe[0]);
+      exit(1);
+    }
+    close(send_pipe[0]);
     char *const argv[] = {const_cast<char *>(script_path.c_str()),
-                          const_cast<char *>(arg.c_str()), nullptr};
-    sleep(1);
-    if (execve(script_path.c_str(), argv, NULL) ==
+                          const_cast<char *>(request.get_response_str().c_str()), NULL};
+    // sleep(1);
+    //environ instead of NULL
+    // std::string meth = "REQUEST_METHOD=" + HttpRequest::method_to_str(request.get_method());
+    // char meth_chr[meth.size() + 1] = meth.c_str();
+    // char meth_chr[20];
+    // if (HttpRequest::method_to_str(request.get_method()) == "GET") {
+    //  meth_chr = "REQUEST_METHOD=GET\0";
+    // } else {
+    //  meth_chr = "REQUEST_METHOD=POST\0";
+    // }
+    // char *env[] = {meth_chr, NULL};
+    //
+    /*
+          SO
+          std::string.header = request.get_header();
+          auto headers_amt = request.get_headers_map().size();
+          std::vector<const char*> envp;
+          // fill the vector with header values
+          env will be ;
+    */
+
+    auto headers = request.get_header_map();
+    std::vector<const char*> envp;
+    for (auto it = headers.begin(); it != headers.end(); it++) {
+      std::string var_name;
+      std::string var_value;
+      std::transform(it->first.begin(), it->first.end(), var_name.begin(), Libft::toupper);
+      std::transform(it->second.begin(), it->second.end(), var_name.begin(), Libft::toupper);
+      std::string var_decl = var_name + "="  + var_value;
+      envp.push_back(var_decl.c_str());
+    }
+    envp.push_back(NULL);
+    std::cerr << "EXECVE" << std::endl;
+    if (execve(script_path.c_str(), const_cast<char* const*>(argv), const_cast<char* const*>(envp.data())) ==
         -1) { // TODO: how to write the whole response instead of script output
       std::cerr << "Error executing cgi\n";
       exit(1);
     }
     exit(1);
   }
-  close(fd[1]);
+  close(send_pipe[0]);
+  close(recv_pipe[1]);
+  write(send_pipe[1], arg.c_str(), sizeof(arg.c_str()) - 1);
+  close(send_pipe[1]);
   cgiResponse res;
   res.cgi_pid = pid_t;
   res.is_keep_alive = is_keep_alive;
-  res.cgi_pipe[0] = fd[0];
-  res.cgi_pipe[1] = fd[1];
+  res.cgi_pipe[0] = recv_pipe[0];
   return res;
 }
 
@@ -555,6 +606,7 @@ std::string get_responses_string(HttpConnection &connection) {
       connection.recv_buffer.clear();
     }
     std::cout << "Oversized!"<<std::endl;
+    connection.close_after_send = true;
     response = HttpHandle::HttpHandle::status_code_to_response(413, config /*dummy*/, false);
   } else {
     response =
@@ -591,3 +643,4 @@ std::string get_responses_string(HttpConnection &connection) {
     exit(1);
   }
 }
+

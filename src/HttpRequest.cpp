@@ -34,6 +34,7 @@ void check_http_version(const std::string &version) {
 HttpRequest::HttpRequest() : HttpRequest("GET / HTTP/1.1\n") {}
 
 HttpRequest::HttpRequest(const string &s) {
+  response_str_ = s;
   std::stringstream stream(s);
   std::string line;
   getline_str(stream, line, CRLF);
@@ -63,6 +64,7 @@ HttpRequest::HttpRequest(const string &s) {
   if (method_ == Method::GET || method_ == Method::DELETE || method_ == Method::HEAD) {
     return;
   }
+  header_ = s.substr(0, s.find(CRLFCRLF));
   std::string body;
   if (headers_.find("Transfer-Encoding") != headers_.end() &&
       headers_.at("Transfer-Encoding") == "chunked") {
@@ -126,6 +128,7 @@ std::string HttpRequest::method_to_str(const Method &method) {
 string HttpRequest::get_url() const { return url_; }
 
 string HttpRequest::get_body() const { return body_; }
+string HttpRequest::get_response_str() const { return response_str_; }
 
 string HttpRequest::get_host() const {
   string host_full = get_header_at("Host");
@@ -150,6 +153,15 @@ int HttpRequest::get_port() const {
 string HttpRequest::get_header_at(const string &s) const {
   return headers_.at(s);
 }
+
+string HttpRequest::get_header() const {
+  return header_;
+}
+
+const std::unordered_map<string, string> &HttpRequest::get_header_map() const {
+  return headers_;
+}
+
 
 HttpRequest::BadRequest::BadRequest(char const *const message) throw()
     : std::runtime_error(message) {}

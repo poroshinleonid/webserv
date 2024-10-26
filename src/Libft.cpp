@@ -23,6 +23,13 @@ int Libft::ft_atoi(const std::string &s) {
   return static_cast<int>(std::strtod(s.c_str(), NULL));
   // return std::atoi(s.c_str());
 }
+ char Libft::toupper(int c) {
+  if (c >= 'a' && c <= 'z') {
+    c -= 'a';
+    c += 'A';
+  }
+  return c;
+ }
 
 unsigned long Libft::ft_atoip(const std::string &s) {
   unsigned long result;

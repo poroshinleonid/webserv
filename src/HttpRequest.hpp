@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include <climits>
 
 #define CRLF "\r\n"
 #define CRLFCRLF "\r\n\r\n"
@@ -31,7 +32,10 @@ public:
   static std::string method_to_str(const Method &method);
   string get_url() const;
   string get_header_at(const string &s) const;
+  string get_header() const;
+  const std::unordered_map<string, string> &get_header_map() const;
   string get_body() const;
+  string get_response_str() const;
   std::string get_host() const; // throws if none
   int get_port() const;         // 80 if none, throws if not int / negative
 private:
@@ -39,6 +43,8 @@ private:
   string url_;
   std::unordered_map<string, string> headers_;
   string body_;
+  string header_;
+  string response_str_;
 
 public:
   class BadRequest : std::runtime_error {

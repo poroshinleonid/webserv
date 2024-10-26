@@ -69,7 +69,7 @@ private:
                                          const std::string &server_url,
                                          const std::string &root);
   static response execute_cgi_response(const std::string &script_path,
-                                       const std::string &arg,
+                                       HttpRequest &arg,
                                        bool is_keep_alive);
   static response delete_file_response(const std::string &url_path,
                                        bool is_keep_alive);

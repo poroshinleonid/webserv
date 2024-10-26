@@ -19,6 +19,15 @@ public:
    */
   static int ft_atoi(const std::string &s);
 
+public:
+  /**
+   * @brief std::atoi
+   *
+   * @param s
+   * @return int
+   */
+  static char toupper(int c);
+
   /**
    * @brief ip string to binary ip representation
    *

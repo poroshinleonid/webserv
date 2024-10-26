@@ -76,7 +76,7 @@ public:
   bool socket_closed;
   bool is_response_ready;
   bool is_keep_alive;
-  bool header_is_parsed;
+  bool close_after_send;
   bool reading_garbage_chunks;
   pid_t cgi_pid;
   int cgi_pipe[2];
