@@ -11,7 +11,7 @@ HttpConnection::HttpConnection()
       last_cgi_activity(0), content_length(-1), is_connected(false),
       is_cgi_running(false), cgi_finished(false), cgi_result(false),
       socket_closed(false), is_response_ready(false), is_keep_alive(false),
-      header_is_parsed(false), body_is_read(false), cgi_pid(0),
+      header_is_parsed(false), reading_garbage_chunks(false), cgi_pid(0),
       is_chunked_transfer(false), recv_done(false) {
   cgi_pipe[0] = 0;
   cgi_pipe[1] = 0;
@@ -31,7 +31,7 @@ HttpConnection::HttpConnection(Config *cfg, Logger *log, Server *srv)
       last_cgi_activity(0), content_length(-1), is_connected(false),
       is_cgi_running(false), cgi_finished(false), cgi_result(false),
       socket_closed(false), is_response_ready(false), is_keep_alive(false),
-      header_is_parsed(false), body_is_read(false), cgi_pid(0),
+      header_is_parsed(false), reading_garbage_chunks(false), cgi_pid(0),
       is_chunked_transfer(false), recv_done(false) {
   (void)cfg;
   (void)srv;
@@ -52,7 +52,7 @@ HttpConnection::HttpConnection(HttpConnection const &other)
       is_response_ready(other.is_response_ready),
       is_keep_alive(other.is_keep_alive),
       header_is_parsed(other.header_is_parsed),
-      body_is_read(other.body_is_read), cgi_pid(other.cgi_pid),
+      reading_garbage_chunks(other.reading_garbage_chunks), cgi_pid(other.cgi_pid),
       is_chunked_transfer(other.is_chunked_transfer) {
   cgi_pipe[0] = other.cgi_pipe[0];
   cgi_pipe[1] = other.cgi_pipe[1];
@@ -83,7 +83,7 @@ HttpConnection &HttpConnection::operator=(const HttpConnection &other) {
   is_response_ready = other.is_response_ready;
   is_keep_alive = other.is_keep_alive;
   header_is_parsed = other.header_is_parsed;
-  body_is_read = other.body_is_read;
+  reading_garbage_chunks = other.reading_garbage_chunks;
   cgi_pid = other.cgi_pid;
   cgi_pipe[0] = other.cgi_pipe[0];
   cgi_pipe[1] = other.cgi_pipe[1];
@@ -163,7 +163,7 @@ void HttpConnection::print_connection() {
   std::cout << is_response_ready << " ";
   std::cout << is_keep_alive << " ";
   std::cout << header_is_parsed << " ";
-  std::cout << body_is_read << " ";
+  std::cout << reading_garbage_chunks << " ";
   std::cout << cgi_pid << " ";
   std::cout << cgi_pipe[0] << " ";
   std::cout << cgi_pipe[1] << " ";

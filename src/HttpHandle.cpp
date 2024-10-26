@@ -11,48 +11,6 @@
 #include <thread>
 #include <unistd.h>
 
-std::string get_responses_string(HttpConnection &connection) {
-  // TODO: (maybe) response to multiple requests
-  // std::string request_str = connection.recv_stream.str();
-  std::string request_str = connection.recv_buffer;
-  std::cout << "Request to handle: [" << request_str << "]" << std::endl;
-  Config config(*connection.config);
-  HttpHandle::response response =
-      HttpHandle::HttpHandle::compose_response(request_str, config);
-  try {
-    auto resp = std::get<HttpHandle::normalResponse>(response);
-    connection.recv_buffer = "";
-    // connection.recv_stream.str(std::string());
-    connection.is_response_ready = true;
-    connection.is_keep_alive = resp.is_keep_alive;
-    return resp.response;
-  } catch (std::bad_variant_access &) { /*ignore*/
-  }
-  try {
-    auto resp = std::get<HttpHandle::cgiResponse>(response);
-    connection.recv_buffer = "";
-    // connection.recv_stream.str(std::string());
-    connection.is_keep_alive = resp.is_keep_alive;
-    connection.is_cgi_running = true;
-    connection.cgi_finished = false;
-    connection.cgi_pid = resp.cgi_pid;
-    connection.cgi_pipe[0] = resp.cgi_pipe[0];
-    connection.cgi_pipe[1] = resp.cgi_pipe[1];
-    return "";
-  } catch (std::bad_variant_access &) { /*ignore*/
-  }
-  try {
-    auto resp = std::get<HttpHandle::requestNotFinished>(response);
-    connection.is_chunked_transfer = resp.is_chunked_transfer;
-    return "";
-  } catch (std::bad_variant_access &) {
-    std::cerr << "You wouldn't have such problem in rust\n";
-    exit(1);
-  }
-}
-
-namespace HttpHandle {
-namespace fs = std::filesystem;
 
 bool is_request_finished(const std::string &request_str) {
   if (request_str.find("\r\n\r\n") != std::string::npos) {
@@ -75,10 +33,23 @@ bool check_chunked_transfer(const std::string &request_str) {
   return false;
 }
 
+bool is_oversized(const std::string &s) {
+  size_t pos = s.find(CRLFCRLF);
+  if (pos == std::string::npos) {
+    pos = 0;
+  }
+  if (s.size() - pos > HttpRequest::MAX_BODY_SIZE) {
+    return true;
+  }
+  return false;
+}
+
+namespace HttpHandle {
+namespace fs = std::filesystem;
+
 response HttpHandle::compose_response(const std::string &request_str,
                                       Config &config) {
   HttpRequest request;
-  
   if (is_request_finished(request_str) == false) {
     return requestNotFinished{.is_chunked_transfer = check_chunked_transfer(request_str)};
   }
@@ -147,6 +118,7 @@ response HttpHandle::compose_response(const std::string &request_str,
                   [&req_method](const std::string &method) {
                     return method != req_method;
                   })) {
+    std::cout << "AAAAA 405 STATUS CODE on " << req_method << " " << url << std::endl;
     return status_code_to_response(405, server_config, is_keep_alive);
   }
 
@@ -430,18 +402,21 @@ Config HttpHandle::select_url_config(const std::string &url,
   return selected;
 }
 
-// void printve(const std::string &name, std::vector<std::string> &v) {
-//   std::cout << name << ": ";
-//   for (auto it = v.begin(); it != v.end(); ++it){
-//     std::cout << *it << " ";
-//   }
-//   std::cout << std::endl;
-// }
+void printve(const std::string &name, std::vector<std::string> &v) {
+  std::cout << name << ": ";
+  for (auto it = v.begin(); it != v.end(); ++it){
+    std::cout << *it << " ";
+  }
+  std::cout << std::endl;
+}
 
 std::string HttpHandle::compose_object_path(const std::string &url,
                                             const std::string &server_url,
                                             const std::string &root) {
   // replaces server_url to root in url
+  std::cout << "url: " << url << std::endl;
+  std::cout << "server_url: " << server_url << std::endl;
+  std::cout << "root: " << root << std::endl;
   std::vector<std::string> parsed_request_url = HttpRequest::parse_url(url);
   std::vector<std::string> parsed_server_url =
       HttpRequest::parse_url(server_url);
@@ -452,6 +427,11 @@ std::string HttpHandle::compose_object_path(const std::string &url,
                      parsed_request_url.begin() + parsed_server_url.size(),
                      parsed_request_url.end());
   std::string joined_result = HttpRequest::join_url(result_path);
+  printve("parsed_request_url", parsed_request_url);
+  printve("parsed_server_url", parsed_server_url);
+  printve("parsed_root", parsed_root);
+  printve("result_path", result_path);
+  std::cout << "joined_result: " << joined_result << std::endl;
   if (trim(root)[0] == '/') {
     joined_result = "/" + joined_result;
   }
@@ -558,3 +538,56 @@ response HttpHandle::delete_file_response(const std::string &url_path,
                         .is_keep_alive = is_keep_alive};
 }
 }; // namespace HttpHandle
+
+
+std::string get_responses_string(HttpConnection &connection) {
+  // TODO: (maybe) response to multiple requests
+  // std::string request_str = connection.recv_stream.str();
+
+  std::string request_str = connection.recv_buffer;
+  std::cout << "Request to handle: [" << request_str << "]" << std::endl;
+  Config config(*connection.config);
+  HttpHandle::response response;
+  if (is_oversized(request_str)) {
+    if (check_chunked_transfer(request_str)) {
+      connection.is_chunked_transfer = true;
+      connection.reading_garbage_chunks = true;
+      connection.recv_buffer.clear();
+    }
+    std::cout << "Oversized!"<<std::endl;
+    response = HttpHandle::HttpHandle::status_code_to_response(413, config /*dummy*/, false);
+  } else {
+    response =
+      HttpHandle::HttpHandle::compose_response(request_str, config);
+  }
+  try {
+    auto resp = std::get<HttpHandle::normalResponse>(response);
+    connection.recv_buffer = "";
+    // connection.recv_stream.str(std::string());
+    connection.is_response_ready = true;
+    connection.is_keep_alive = resp.is_keep_alive;
+    return resp.response;
+  } catch (std::bad_variant_access &) { /*ignore*/
+  }
+  try {
+    auto resp = std::get<HttpHandle::cgiResponse>(response);
+    connection.recv_buffer = "";
+    // connection.recv_stream.str(std::string());
+    connection.is_keep_alive = resp.is_keep_alive;
+    connection.is_cgi_running = true;
+    connection.cgi_finished = false;
+    connection.cgi_pid = resp.cgi_pid;
+    connection.cgi_pipe[0] = resp.cgi_pipe[0];
+    connection.cgi_pipe[1] = resp.cgi_pipe[1];
+    return "";
+  } catch (std::bad_variant_access &) { /*ignore*/
+  }
+  try {
+    auto resp = std::get<HttpHandle::requestNotFinished>(response);
+    connection.is_chunked_transfer = resp.is_chunked_transfer;
+    return "";
+  } catch (std::bad_variant_access &) {
+    std::cerr << "You wouldn't have such problem in rust\n";
+    exit(1);
+  }
+}

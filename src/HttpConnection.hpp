@@ -77,7 +77,7 @@ public:
   bool is_response_ready;
   bool is_keep_alive;
   bool header_is_parsed;
-  bool body_is_read;
+  bool reading_garbage_chunks;
   pid_t cgi_pid;
   int cgi_pipe[2];
   bool is_chunked_transfer;

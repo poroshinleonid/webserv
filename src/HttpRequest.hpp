@@ -16,7 +16,7 @@ class HttpRequest {
   using stringstream = std::stringstream;
 
 public:
-  static const int MAX_BODY_SIZE = 1 * 1000 * 1000;
+  static const int MAX_BODY_SIZE = INT_MAX;
   static const std::array<string, 2> allowedHttpVersions;
   static std::vector<std::string> parse_url(const std::string &url);
   static std::string join_url(const std::vector<std::string> &parsed_url);

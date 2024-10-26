@@ -34,6 +34,10 @@ public:
   HttpHandle() = delete;
   static response compose_response(const std::string &request_str,
                                    Config &config);
+  static response status_code_to_response(int status_code,
+                                          Config &server_config,
+                                          bool is_keep_alive);
+
 
 private:
   static Config
@@ -67,9 +71,6 @@ private:
   static response execute_cgi_response(const std::string &script_path,
                                        const std::string &arg,
                                        bool is_keep_alive);
-  static response status_code_to_response(int status_code,
-                                          Config &server_config,
-                                          bool is_keep_alive);
   static response delete_file_response(const std::string &url_path,
                                        bool is_keep_alive);
 

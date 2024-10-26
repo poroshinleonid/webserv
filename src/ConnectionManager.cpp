@@ -330,6 +330,19 @@ bool ConnectionManager::handle_poll_read(int fd) {
   //   response_string = get_responses_string(connection);
   // }
 
+  if (connection.is_chunked_transfer == true && connection.reading_garbage_chunks == true) {
+    if (connection.recv_buffer.find("0\r\n\r\n")) {
+      std::cout << "FOUND TERMINATING CHUNK" << std::endl;
+      connection.reading_garbage_chunks = false;
+      connection.is_chunked_transfer = false;
+      connection.recv_done = true;
+    }
+    if (connection.recv_buffer.size() > HttpRequest::MAX_BODY_SIZE) {
+      connection.recv_buffer.erase(0, HttpRequest::MAX_BODY_SIZE - 5);
+    }
+    return true;
+  }
+
   response_string = get_responses_string(connection);
   // this means not the whole request was recv()-d
   if (response_string.empty() && connection.is_cgi_running == false) {
