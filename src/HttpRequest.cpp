@@ -31,7 +31,7 @@ void check_http_version(const std::string &version) {
 }
 } // namespace
 
-HttpRequest::HttpRequest() : HttpRequest("GET / HTTP/1.1\n") {}
+HttpRequest::HttpRequest() : HttpRequest("GET / HTTP/1.1\r\n\r\n") {}
 
 HttpRequest::HttpRequest(const string &s) {
   response_str_ = s;
@@ -49,6 +49,9 @@ HttpRequest::HttpRequest(const string &s) {
   method_ = ::get_method(line.substr(0, method_end));
   url_ = trim(line.substr(url_start, url_end - url_start));
   check_http_version(trim(line.substr(url_end + 1)));
+  if (s.find(CRLFCRLF) == std::string::npos && s.find("Transfer-Ecnoding") == std::string::npos) {
+    throw RequestNotFinished("not chunked");
+  }
   while (true) {
     getline_str(stream, line, CRLF);
     if (line == "") {
