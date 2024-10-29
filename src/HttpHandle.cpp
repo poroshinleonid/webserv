@@ -48,7 +48,7 @@ namespace HttpHandle {
 namespace fs = std::filesystem;
 
 response HttpHandle::compose_response(const std::string &request_str,
-                                      Config &config) {
+                                      Config &config, HttpConnection &connection) {
   HttpRequest request;
   if (is_request_finished(request_str) == false) {
     return requestNotFinished{.is_chunked_transfer = check_chunked_transfer(request_str)};
@@ -70,6 +70,22 @@ response HttpHandle::compose_response(const std::string &request_str,
   } catch (...) { /*ignore*/
   }
 
+  //connection.recv_buffer
+  long content_len =  -1;
+  try {
+    content_len = Libft::ft_atoi(request.get_header_at("Content-Length"));
+    if (content_len > HttpRequest::MAX_BODY_SIZE) {
+      if (check_chunked_transfer(request_str)) {
+        connection.is_chunked_transfer = true;
+        connection.reading_garbage_chunks = true;
+        connection.recv_buffer.clear();
+      }
+      std::cout << "Oversized!"<<std::endl;
+      connection.close_after_send = true;
+      return status_code_to_response(413, config /*dummy*/, false);
+    }
+  } catch (...) { /*ignore*/
+  }
   if (request.get_body().size() > HttpRequest::MAX_BODY_SIZE) {
     return status_code_to_response(413, config /*dummy*/, is_keep_alive);
   }
@@ -193,7 +209,8 @@ response HttpHandle::compose_response(const std::string &request_str,
     if (path.extension() == cgi_extension) {
       // prep_env(request);
       std::cout << "Sending to CGI: " << request.get_body() << std::endl;
-      object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
+      // object_path = "/Users/lporoshi/Documents/webserv/cgi_tester.py";
+      object_path = "/Users/lporoshi/Documents/webserv/cgi_tester";
       if (request.get_method() == HttpRequest::Method::POST) {
         return execute_cgi_response(object_path, request,
                                     is_keep_alive);
@@ -328,45 +345,35 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
       exit(1);
     }
     close(recv_pipe[1]);
+    close(send_pipe[1]);
     if (dup2(send_pipe[0], STDIN_FILENO) == -1) {
       std::cerr << "dup2 error\n";
       close(send_pipe[0]);
       exit(1);
     }
     close(send_pipe[0]);
+    std::string resp_s = request.get_response_str();
+    const char *resp_c_str = resp_s.c_str();
     char *const argv[] = {const_cast<char *>(script_path.c_str()),
-                          const_cast<char *>(request.get_response_str().c_str()), NULL};
-    // sleep(1);
-    //environ instead of NULL
-    // std::string meth = "REQUEST_METHOD=" + HttpRequest::method_to_str(request.get_method());
-    // char meth_chr[meth.size() + 1] = meth.c_str();
-    // char meth_chr[20];
-    // if (HttpRequest::method_to_str(request.get_method()) == "GET") {
-    //  meth_chr = "REQUEST_METHOD=GET\0";
-    // } else {
-    //  meth_chr = "REQUEST_METHOD=POST\0";
-    // }
-    // char *env[] = {meth_chr, NULL};
-    //
-    /*
-          SO
-          std::string.header = request.get_header();
-          auto headers_amt = request.get_headers_map().size();
-          std::vector<const char*> envp;
-          // fill the vector with header values
-          env will be ;
-    */
+                          const_cast<char *>(resp_c_str), NULL};
 
     auto headers = request.get_header_map();
     std::vector<const char*> envp;
     for (auto it = headers.begin(); it != headers.end(); it++) {
       std::string var_name;
       std::string var_value;
-      std::transform(it->first.begin(), it->first.end(), var_name.begin(), Libft::toupper);
-      std::transform(it->second.begin(), it->second.end(), var_name.begin(), Libft::toupper);
+      std::transform(it->first.begin(), it->first.end(), std::back_inserter(var_name), Libft::toupper);
+      std::transform(it->second.begin(), it->second.end(), std::back_inserter(var_value), Libft::toupper);
       std::string var_decl = var_name + "="  + var_value;
+      // std::cout << "Pushing to env: " << var_decl << std::endl;
       envp.push_back(var_decl.c_str());
     }
+    std::string tmp_s = "REQUEST_METHOD=" + HttpRequest::method_to_str(request.get_method());
+    envp.push_back(tmp_s.c_str());
+    std::string tmp_s2 = "SERVER_PROTOCOL=HTTP/1.1";
+    envp.push_back(tmp_s2.c_str());
+    std::string tmp_s3 = "PATH_INFO=" + request.get_url();
+    envp.push_back(tmp_s3.c_str());
     envp.push_back(NULL);
     std::cerr << "EXECVE" << std::endl;
     if (execve(script_path.c_str(), const_cast<char* const*>(argv), const_cast<char* const*>(envp.data())) ==
@@ -376,10 +383,13 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     }
     exit(1);
   }
+
   close(send_pipe[0]);
-  close(recv_pipe[1]);
-  write(send_pipe[1], arg.c_str(), sizeof(arg.c_str()) - 1);
+  if (arg.size() != 0) {
+    write(send_pipe[1], arg.c_str(), arg.size()); // CGI hangs
+  }
   close(send_pipe[1]);
+  close(recv_pipe[1]);
   cgiResponse res;
   res.cgi_pid = pid_t;
   res.is_keep_alive = is_keep_alive;
@@ -610,7 +620,7 @@ std::string get_responses_string(HttpConnection &connection) {
     response = HttpHandle::HttpHandle::status_code_to_response(413, config /*dummy*/, false);
   } else {
     response =
-      HttpHandle::HttpHandle::compose_response(request_str, config);
+      HttpHandle::HttpHandle::compose_response(request_str, config, connection);
   }
   try {
     auto resp = std::get<HttpHandle::normalResponse>(response);

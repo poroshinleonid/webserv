@@ -31,6 +31,14 @@ int Libft::ft_atoi(const std::string &s) {
   return c;
  }
 
+ char Libft::toenv(int c) {
+  c = toupper(c);
+  if (c == ' ') {
+    c = '_';
+  }
+  return c;
+ }
+
 unsigned long Libft::ft_atoip(const std::string &s) {
   unsigned long result;
   // string_to_ip
