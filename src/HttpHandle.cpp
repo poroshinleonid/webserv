@@ -50,16 +50,17 @@ namespace fs = std::filesystem;
 response HttpHandle::compose_response(const std::string &request_str,
                                       Config &config, HttpConnection &connection) {
   HttpRequest request;
-  if (is_request_finished(request_str) == false) {
-    return requestNotFinished{.is_chunked_transfer = check_chunked_transfer(request_str)};
-  }
   try {
     request = HttpRequest(request_str);
   } catch (HttpRequest::BadRequest &e) {
     std::cout << "Bad Request: " << e.what() << std::endl;
     return status_code_to_response(400, config /*dummy*/, false /*default*/);
-  } catch (HttpRequest::RequestNotFinished &) {
-    return requestNotFinished{.is_chunked_transfer = true};
+  } catch (HttpRequest::RequestNotFinished &e) {
+    if (std::string(e.what()) == "not chunked") {
+      return requestNotFinished{.is_chunked_transfer = false};
+    } else {
+      return requestNotFinished{.is_chunked_transfer = true};
+    }
   }
 
   bool is_keep_alive = false;
@@ -204,13 +205,11 @@ response HttpHandle::compose_response(const std::string &request_str,
     std::cerr << "Error: couldn't read " << object_path << "\n";
     return status_code_to_response(404, server_config, is_keep_alive);
   }
-  const std::string cgi_extension = ".bla";
+  const std::string cgi_extension = ".py";
   try {
     if (path.extension() == cgi_extension) {
       // prep_env(request);
       std::cout << "Sending to CGI: " << request.get_body() << std::endl;
-      // object_path = "/Users/lporoshi/Documents/webserv/cgi_tester.py";
-      object_path = "/Users/lporoshi/Documents/webserv/cgi_tester";
       if (request.get_method() == HttpRequest::Method::POST) {
         return execute_cgi_response(object_path, request,
                                     is_keep_alive);

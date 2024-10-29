@@ -31,9 +31,12 @@ void check_http_version(const std::string &version) {
 }
 } // namespace
 
-HttpRequest::HttpRequest() : HttpRequest("GET / HTTP/1.1\n") {}
+HttpRequest::HttpRequest() : HttpRequest("GET / HTTP/1.1\r\n\r\n") {}
 
 HttpRequest::HttpRequest(const string &s) {
+  if (s.find(CRLFCRLF) == std::string::npos && s.find("Transfer-Ecnoding") == std::string::npos) {
+    throw RequestNotFinished("not chunked");
+  }
   response_str_ = s;
   std::stringstream stream(s);
   std::string line;
