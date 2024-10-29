@@ -33,7 +33,7 @@ class HttpHandle {
 public:
   HttpHandle() = delete;
   static response compose_response(const std::string &request_str,
-                                   Config &config);
+                                   Config &config, HttpConnection &connection);
   static response status_code_to_response(int status_code,
                                           Config &server_config,
                                           bool is_keep_alive);

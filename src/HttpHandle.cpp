@@ -48,7 +48,7 @@ namespace HttpHandle {
 namespace fs = std::filesystem;
 
 response HttpHandle::compose_response(const std::string &request_str,
-                                      Config &config) {
+                                      Config &config, HttpConnection &connection) {
   HttpRequest request;
   if (is_request_finished(request_str) == false) {
     return requestNotFinished{.is_chunked_transfer = check_chunked_transfer(request_str)};
@@ -70,6 +70,22 @@ response HttpHandle::compose_response(const std::string &request_str,
   } catch (...) { /*ignore*/
   }
 
+  //connection.recv_buffer
+  long content_len =  -1;
+  try {
+    content_len = Libft::ft_atoi(request.get_header_at("Content-Length"));
+    if (content_len > HttpRequest::MAX_BODY_SIZE) {
+      if (check_chunked_transfer(request_str)) {
+        connection.is_chunked_transfer = true;
+        connection.reading_garbage_chunks = true;
+        connection.recv_buffer.clear();
+      }
+      std::cout << "Oversized!"<<std::endl;
+      connection.close_after_send = true;
+      return status_code_to_response(413, config /*dummy*/, false);
+    }
+  } catch (...) { /*ignore*/
+  }
   if (request.get_body().size() > HttpRequest::MAX_BODY_SIZE) {
     return status_code_to_response(413, config /*dummy*/, is_keep_alive);
   }
@@ -604,7 +620,7 @@ std::string get_responses_string(HttpConnection &connection) {
     response = HttpHandle::HttpHandle::status_code_to_response(413, config /*dummy*/, false);
   } else {
     response =
-      HttpHandle::HttpHandle::compose_response(request_str, config);
+      HttpHandle::HttpHandle::compose_response(request_str, config, connection);
   }
   try {
     auto resp = std::get<HttpHandle::normalResponse>(response);
