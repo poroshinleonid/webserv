@@ -21,12 +21,21 @@ public:
 
 public:
   /**
-   * @brief std::atoi
+   * @brief std::toupper
    *
    * @param s
    * @return int
    */
   static char toupper(int c);
+
+  /**
+   * @brief http header to env var
+   * 
+   * @param c 
+   * @return char 
+   */
+  static char toenv(int c);
+
 
   /**
    * @brief ip string to binary ip representation

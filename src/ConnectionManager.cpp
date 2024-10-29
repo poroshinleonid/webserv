@@ -173,6 +173,7 @@ int ConnectionManager::run() {
     return 1;
   }
   while (!sig_stop) {
+    // write(1, "e", 1);
     int poll_result =
         poll(fds.data(), fds.size(), 10); // REVISE:timeout from cfg?
     if (poll_result == -1) {
@@ -239,9 +240,11 @@ void ConnectionManager::handle_revent_problem(int fd) {
   }
   // fds[find_fd_index(fd)].revents = 0;
   if (fd_type == "Socket ") {
+    std::cout << "1";
     close_connection(fd);
   } else {
     kill_cgi(pipe_to_socket[fd]);
+    std::cout << "2";
     close_connection(pipe_to_socket[fd]);
   }
 }
@@ -263,6 +266,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   // either finished or timed out
   if (connection.is_cgi_running) {
     if (cgi_timed_out(fd)) {
+      std::cout << "1";
       timeout_and_kill_cgi(fd);
     }
     return false;
@@ -406,12 +410,14 @@ bool ConnectionManager::handle_poll_write(int fd) {
   fds[find_fd_index(fd)].revents = 0;
   // if the connection timed out, we just close it
   if (conn_timed_out(fd)) {
+    std::cout << "3";
     close_connection(fd);
     return false;
   }
   // if the cgi timed out, we kill it and are ready to recieve
   if (connections[fd].is_cgi_running) {
     if (cgi_timed_out(fd)) {
+      std::cout << "2";
       timeout_and_kill_cgi(fd);
       fds[find_fd_index(fd)].events = POLLIN;
     }
@@ -440,7 +446,8 @@ bool ConnectionManager::handle_poll_write(int fd) {
   connections[fd].send_buffer.erase(0, bytes_sent);
   // If we sent everything we needed, we are ready to recieve again
   if (connections[fd].send_buffer.empty()) {
-    if (connections[fd].close_after_send == true) {
+    if (connections[fd].close_after_send == true || connections[fd].is_keep_alive == false) {
+    std::cout << "4";
       close_connection(fd);
       return true;
     }
@@ -494,6 +501,7 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   while ((bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len)) > 0) {
     connection.send_buffer.append(cgi_buffer);
     Libft::ft_memset(cgi_buffer, buf_len, 0);
+    std::cout << "a";
   }
   connection.update_last_cgi_activity();
   // connection.send_buffer.append(cgi_buffer);
@@ -503,10 +511,14 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
     logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
                       ": read() failed on CGI pipe " +
                       Libft::ft_itos(connection.cgi_pipe[0]));
-    connection.send_buffer = "INTERNAL SERVER ERROR";
+    connection.send_buffer = "HTTP/1.1 500 Internal server error";
     connection.is_response_ready = true;
     kill_cgi(connection.fd);
     return true;
+  }
+  size_t index = connection.send_buffer.find("Status: ");
+  if (index != std::string::npos) {
+    connection.send_buffer.replace(index, 7, "HTTP/1.1 ", 9);
   }
   // Couldn't get all of the CGI output in one read
   // if (bytes_read == buf_len) {
@@ -535,6 +547,7 @@ void ConnectionManager::close_connection(int fd) {
     close(fd);
   }
   if (connections[fd].is_cgi_running == true) {
+    logger->log_warning("closing the connection so killling the CGI");
     kill_cgi(fd);
   }
   for (std::vector<struct pollfd>::iterator it = fds.begin(); it != fds.end();
@@ -549,6 +562,8 @@ void ConnectionManager::close_connection(int fd) {
 }
 
 bool ConnectionManager::conn_timed_out(int fd) {
+  (void)fd;
+  return false;
   time_t now;
   now = std::time(&now);
   double connection_age = std::difftime(now, connections[fd].last_activity);
@@ -583,6 +598,7 @@ void ConnectionManager::kill_cgi(int connection_fd) {
 
 // FIX: "CGI TIMEOUT" should be a complete valid response
 void ConnectionManager::timeout_and_kill_cgi(int connection_fd) {
+  logger->log_warning("CGI timed out, killing " + Libft::ft_itos(connection_fd));
   std::cout << "TIMEOUT CGI" << std::endl;
   kill_cgi(connection_fd);
   connections[connection_fd].send_buffer = "CGI TIMEOUT";
