@@ -27,6 +27,8 @@ Config::Config(const std::string &filename) : depth_(0) {
 
 Config::Config() : Config("{}", true) {}
 
+Config::Config(const Config& other): content_(other.content_) {}
+
 Config Config::operator[](const std::string &key) {
   try {
     get_value(key);

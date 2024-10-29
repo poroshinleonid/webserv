@@ -59,6 +59,8 @@ public:
    */
   Config(const std::string &filename);
 
+  Config(const Config& other);
+
   /**
    * @brief Checks if the key is present.
    *
