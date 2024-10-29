@@ -521,13 +521,8 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
                    Libft::ft_itos(connection.cgi_pipe[0]));
   Libft::ft_memset(cgi_buffer, buf_len, 0);
   int bytes_read;
-  // FIX
-  while ((bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len)) > 0) {
-    connection.send_buffer.append(cgi_buffer);
-    Libft::ft_memset(cgi_buffer, buf_len, 0);
-    std::cout << "a";
-  }
   connection.update_last_cgi_activity();
+  bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len);
   // connection.send_buffer.append(cgi_buffer);
   // Libft::ft_memset(cgi_buffer, buf_len, 0);
   // FIX: INTERNAL SERVER ERROR should be a complete valid response.
@@ -535,20 +530,32 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
     logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
                       ": read() failed on CGI pipe " +
                       Libft::ft_itos(connection.cgi_pipe[0]));
-    connection.send_buffer = "HTTP/1.1 500 Internal server error";
+    connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n";
     connection.is_response_ready = true;
     kill_cgi(connection.fd);
     return true;
+  }else if (bytes_read == buf_len) {
+    connection.send_buffer.append(cgi_buffer);
+    Libft::ft_memset(cgi_buffer, buf_len, 0);
+    return true;
+  } else if (bytes_read == 0) {
+    connection.send_buffer.append(cgi_buffer);
+    Libft::ft_memset(cgi_buffer, buf_len, 0);
+    size_t index = connection.send_buffer.find("Status: ");
+    if (index != std::string::npos) {
+      connection.send_buffer.replace(index, 7, "HTTP/1.1 ", 9);
+    }
+    if (connection.send_buffer.size() == 0) {
+      connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n"; // CGI returned nothing for some reason
+    }
+  }  else { // bytes_read < buf_len
+    connection.send_buffer.append(cgi_buffer);
+    Libft::ft_memset(cgi_buffer, buf_len, 0);
+    size_t index = connection.send_buffer.find("Status: ");
+    if (index != std::string::npos) {
+      connection.send_buffer.replace(index, 7, "HTTP/1.1 ", 9);
+    }
   }
-  size_t index = connection.send_buffer.find("Status: ");
-  if (index != std::string::npos) {
-    connection.send_buffer.replace(index, 7, "HTTP/1.1 ", 9);
-  }
-  // Couldn't get all of the CGI output in one read
-  // if (bytes_read == buf_len) {
-  //   return true;
-  // }
-  // if we are here, the read from CGI pipe is finished
   std::cout << "Finished reading from CGI pipe, killing it: " << connection.send_buffer.size() << std::endl;
   kill_cgi(connection.fd);
   connection.is_cgi_running = false;
