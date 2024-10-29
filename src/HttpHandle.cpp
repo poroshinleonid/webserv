@@ -49,6 +49,7 @@ namespace fs = std::filesystem;
 
 response HttpHandle::compose_response(const std::string &request_str,
                                       Config &config, HttpConnection &connection) {
+                                        (void)connection;
   HttpRequest request;
   if (is_request_finished(request_str) == false) {
     return requestNotFinished{.is_chunked_transfer = check_chunked_transfer(request_str)};
@@ -71,24 +72,24 @@ response HttpHandle::compose_response(const std::string &request_str,
   }
 
   //connection.recv_buffer
-  long content_len =  -1;
-  try {
-    content_len = Libft::ft_atoi(request.get_header_at("Content-Length"));
-    if (content_len > HttpRequest::MAX_BODY_SIZE) {
-      if (check_chunked_transfer(request_str)) {
-        connection.is_chunked_transfer = true;
-        connection.reading_garbage_chunks = true;
-        connection.recv_buffer.clear();
-      }
-      std::cout << "Oversized!"<<std::endl;
-      connection.close_after_send = true;
-      return status_code_to_response(413, config /*dummy*/, false);
-    }
-  } catch (...) { /*ignore*/
-  }
-  if (request.get_body().size() > HttpRequest::MAX_BODY_SIZE) {
-    return status_code_to_response(413, config /*dummy*/, is_keep_alive);
-  }
+  // long content_len =  -1;
+  // try {
+  //   content_len = Libft::ft_atoi(request.get_header_at("Content-Length"));
+  //   if (content_len > HttpRequest::MAX_BODY_SIZE) {
+  //     if (check_chunked_transfer(request_str)) {
+  //       connection.is_chunked_transfer = true;
+  //       connection.reading_garbage_chunks = true;
+  //       connection.recv_buffer.clear();
+  //     }
+  //     std::cout << "Oversized!"<<std::endl;
+  //     connection.close_after_send = true;
+  //     return status_code_to_response(413, config /*dummy*/, false);
+  //   }
+  // } catch (...) { /*ignore*/
+  // }
+  // if (request.get_body().size() > HttpRequest::MAX_BODY_SIZE) {
+  //   return status_code_to_response(413, config /*dummy*/, is_keep_alive);
+  // }
 
   try {
     request.get_host();
@@ -386,6 +387,8 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
 
   close(send_pipe[0]);
   if (arg.size() != 0) {
+    // FIX do in chunks?
+    // FIX check for -1 and kill if there's a problem.
     write(send_pipe[1], arg.c_str(), arg.size()); // CGI hangs
   }
   close(send_pipe[1]);
@@ -609,7 +612,8 @@ std::string get_responses_string(HttpConnection &connection) {
   std::cout << "Request to handle: [" << request_str << "]" << std::endl;
   Config config(*connection.config);
   HttpHandle::response response;
-  if (is_oversized(request_str)) {
+  if (false) {
+  // if (is_oversized(request_str)) {
     if (check_chunked_transfer(request_str)) {
       connection.is_chunked_transfer = true;
       connection.reading_garbage_chunks = true;

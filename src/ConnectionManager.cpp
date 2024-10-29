@@ -30,10 +30,13 @@
 
 #define recv_chunk_sz 32768
 
+#define TRU 1
+#define FALS 0
+
 bool sig_stop = false;
 
 ConnectionManager::ConnectionManager(Config *cfg, Logger *log)
-    : config(cfg), logger(log) {
+    : config(cfg), logger(log), fds({}) {
   bzero(buffer, sizeof(buffer));
   bzero(cgi_buffer, sizeof(cgi_buffer));
 }
@@ -134,8 +137,10 @@ int ConnectionManager::start_server(Server &serv) {
   logger->log_info(status_message);
   serv.listen_fd = new_listen_fd;
   listen_servers[serv.listen_fd] = serv;
-  struct pollfd poll_fd = {serv.listen_fd, POLLIN, 0};
+  struct pollfd poll_fd = {serv.listen_fd, POLLIN | POLLOUT, 0};
   fds.push_back(poll_fd);
+  pollin.push_back(TRU);
+  pollout.push_back(FALS);
   return 0;
 }
 
@@ -173,7 +178,6 @@ int ConnectionManager::run() {
     return 1;
   }
   while (!sig_stop) {
-    // write(1, "e", 1);
     int poll_result =
         poll(fds.data(), fds.size(), 10); // REVISE:timeout from cfg?
     if (poll_result == -1) {
@@ -213,9 +217,9 @@ int ConnectionManager::handle_fds() {
       cleanup(fd);
     } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
       handle_revent_problem(fd);
-    } else if (fds[i].revents & POLLIN) {
+    } else if ((fds[i].revents & POLLIN) && pollin[i] == TRU) {
       io_happened = handle_poll_read(fd);
-    } else if (fds[i].revents & POLLOUT) {
+    } else if ((fds[i].revents & POLLOUT) && pollout[i] == TRU) {
       io_happened = handle_poll_write(fd);
     }
     pollvec_len = fds.size();
@@ -250,6 +254,10 @@ void ConnectionManager::handle_revent_problem(int fd) {
 }
 
 bool ConnectionManager::handle_poll_read(int fd) {
+  if (pollin[find_fd_index(fd)] == FALS) {
+    std::cout << "a";
+    return false;
+  }
   fds[find_fd_index(fd)].revents = 0;
   // Check if bytes actually came from a CGI and not from a client
   if (pipe_to_socket.find(fd) != pipe_to_socket.end()) {
@@ -277,7 +285,8 @@ bool ConnectionManager::handle_poll_read(int fd) {
         "Socket " + Libft::ft_itos(fd) +
         ": there's something to read according to poll(), but recv_done=true "
         "which means that the previous request wasn't responed yet");
-        fds[find_fd_index(fd)].events = 0;
+        pollin[find_fd_index(fd)] = FALS;
+        pollout[find_fd_index(fd)] = FALS;
     return false;
   }
 
@@ -297,7 +306,8 @@ bool ConnectionManager::handle_poll_read(int fd) {
     } else {
       logger->log_info("Socket " + Libft::ft_itos(fd) +
                        " sent 0 bytes but my CGI is still running.");
-      fds[find_fd_index(fd)].events &= POLLOUT;
+      pollout[find_fd_index(fd)] = TRU;
+      pollin[find_fd_index(fd)] = FALS;
     }
     return true;
   }
@@ -343,18 +353,18 @@ bool ConnectionManager::handle_poll_read(int fd) {
   //   response_string = get_responses_string(connection);
   // }
 
-  if (connection.is_chunked_transfer == true && connection.reading_garbage_chunks == true) {
-    if (connection.recv_buffer.find("0\r\n\r\n")) {
-      std::cout << "FOUND TERMINATING CHUNK" << std::endl;
-      connection.reading_garbage_chunks = false;
-      connection.is_chunked_transfer = false;
-      connection.recv_done = true;
-    }
-    if (connection.recv_buffer.size() > HttpRequest::MAX_BODY_SIZE) {
-      connection.recv_buffer.erase(0, HttpRequest::MAX_BODY_SIZE - 5);
-    }
-    return true;
-  }
+  // if (connection.is_chunked_transfer == true && connection.reading_garbage_chunks == true) {
+  //   if (connection.recv_buffer.find("0\r\n\r\n")) {
+  //     std::cout << "FOUND TERMINATING CHUNK" << std::endl;
+  //     connection.reading_garbage_chunks = false;
+  //     connection.is_chunked_transfer = false;
+  //     connection.recv_done = true;
+  //   }
+  //   if (connection.recv_buffer.size() > HttpRequest::MAX_BODY_SIZE) {
+  //     connection.recv_buffer.erase(0, HttpRequest::MAX_BODY_SIZE - 5);
+  //   }
+  //   return true;
+  // }
 
   response_string = get_responses_string(connection);
   // this means not the whole request was recv()-d
@@ -362,10 +372,13 @@ bool ConnectionManager::handle_poll_read(int fd) {
     return true;
   }
   connection.recv_done = true;
-  fds[find_fd_index(fd)].events = POLLOUT;
+  pollout[find_fd_index(fd)] = TRU;
+  pollin[find_fd_index(fd)] = FALS;
   if (response_string.empty() && connection.is_cgi_running == true) {
-    struct pollfd new_pollfd_struct = {connection.cgi_pipe[0], POLLIN, 0};
+    struct pollfd new_pollfd_struct = {connection.cgi_pipe[0], POLLIN | POLLOUT, 0};
     fds.push_back(new_pollfd_struct);
+    pollin.push_back(TRU);
+    pollout.push_back(FALS);
     pipe_to_socket[connection.cgi_pipe[0]] = fd;
     std::cerr << "CGI PIPE ON FD " << Libft::ft_itos(connection.cgi_pipe[0]) << ", Socket: " << fd << std::endl;
   }
@@ -398,8 +411,10 @@ void ConnectionManager::handle_accept(int fd) {
 
   struct pollfd new_pollfd_struct;
   new_pollfd_struct.fd = new_fd;
-  new_pollfd_struct.events = POLLIN;
+  new_pollfd_struct.events = POLLIN | POLLOUT;
   fds.push_back(new_pollfd_struct);
+  pollin.push_back(TRU);
+  pollout.push_back(FALS);
   HttpConnection connection(config, logger, &listen_servers[fd]);
   connection.fd = new_fd;
   connections[new_fd] = connection;
@@ -407,6 +422,10 @@ void ConnectionManager::handle_accept(int fd) {
 }
 
 bool ConnectionManager::handle_poll_write(int fd) {
+  if (pollout[find_fd_index(fd)] == FALS) {
+    std::cout << "o";
+    return false;
+  }
   fds[find_fd_index(fd)].revents = 0;
   // if the connection timed out, we just close it
   if (conn_timed_out(fd)) {
@@ -419,7 +438,8 @@ bool ConnectionManager::handle_poll_write(int fd) {
     if (cgi_timed_out(fd)) {
       std::cout << "2";
       timeout_and_kill_cgi(fd);
-      fds[find_fd_index(fd)].events = POLLIN;
+      pollout[find_fd_index(fd)] = FALS;
+      pollin[find_fd_index(fd)] = TRU;
     }
     return false;
   }
@@ -427,7 +447,9 @@ bool ConnectionManager::handle_poll_write(int fd) {
   if (connections[fd].send_buffer.empty()) {
     logger->log_error("Something wrong, this shouldn't happen. Nothing to send "
                       "but poll() searched for pollout");
-    fds[find_fd_index(fd)].events = 0;
+    // fds[find_fd_index(fd)].events = 0;
+    pollin[find_fd_index(fd)] = FALS;
+    pollout[find_fd_index(fd)] = FALS;
     return false;
   }
   int bytes_sent = send(fd, connections[fd].send_buffer.c_str(),
@@ -451,7 +473,8 @@ bool ConnectionManager::handle_poll_write(int fd) {
       close_connection(fd);
       return true;
     }
-    fds[find_fd_index(fd)].events = POLLIN;
+    pollout[find_fd_index(fd)] = FALS;
+    pollin[find_fd_index(fd)] = TRU;
     connections[fd].recv_done = false;
     connections[fd].is_chunked_transfer = false;
   }
@@ -498,6 +521,7 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
                    Libft::ft_itos(connection.cgi_pipe[0]));
   Libft::ft_memset(cgi_buffer, buf_len, 0);
   int bytes_read;
+  // FIX
   while ((bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len)) > 0) {
     connection.send_buffer.append(cgi_buffer);
     Libft::ft_memset(cgi_buffer, buf_len, 0);
@@ -530,7 +554,9 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   connection.is_cgi_running = false;
   connection.cgi_finished = true;
   connection.is_response_ready = true;
-  fds[find_fd_index(connection.fd)].events = POLLOUT;
+  // fds[find_fd_index(connection.fd)].events = POLLOUT;
+  pollout[find_fd_index(connection.fd)] =TRU;
+  pollin[find_fd_index(connection.fd)] =FALS;
   return true;
 }
 
@@ -550,13 +576,21 @@ void ConnectionManager::close_connection(int fd) {
     logger->log_warning("closing the connection so killling the CGI");
     kill_cgi(fd);
   }
-  for (std::vector<struct pollfd>::iterator it = fds.begin(); it != fds.end();
-       ++it) {
-    if (it->fd == fd) {
-      fds.erase(it);
+  for (size_t i = 0, ie = fds.size(); i < ie; ++i) {
+    if (fds[i].fd == fd) {
+      fds.erase(fds.begin() + i);
+      pollin.erase(pollin.begin() + i);
+      pollout.erase(pollout.begin() + i);
       break;
     }
   }
+  // for (std::vector<struct pollfd>::iterator it = fds.begin(); it != fds.end();
+  //      ++it) {
+  //   if (it->fd == fd) {
+  //     fds.erase(it);
+  //     break;
+  //   }
+  // }
   connections.erase(fd);
   logger->log_info("Socket " + Libft::ft_itos(fd) + ": Closed the connection");
 }
@@ -591,9 +625,13 @@ void ConnectionManager::kill_cgi(int connection_fd) {
   int pipe_fd_number = connections[connection_fd].cgi_pipe[0];
   std::cout << "CGI killed" << std::endl;
   fds.erase(fds.begin() + find_fd_index(pipe_fd_number));
+  pollin.erase(pollin.begin() + find_fd_index(pipe_fd_number));
+  pollin.erase(pollin.begin() + find_fd_index(pipe_fd_number));
   pipe_to_socket.erase(connections[connection_fd].cgi_pipe[0]);
   connections[connection_fd].is_cgi_running = false;
-  fds[find_fd_index(connection_fd)].events = POLLIN;
+  // fds[find_fd_index(connection_fd)].events = POLLIN;
+  pollout[find_fd_index(connection_fd)] =FALS;
+  pollin[find_fd_index(connection_fd)] =TRU;
 }
 
 // FIX: "CGI TIMEOUT" should be a complete valid response
@@ -618,12 +656,20 @@ void ConnectionManager::shutdown_server(int listen_fd) {
     ++it;
   }
   close(srv->listen_fd);
-  for (auto it = fds.begin(); it != fds.end(); ++it) {
-    if (it->fd == listen_fd) {
-      fds.erase(it);
+  for (size_t i = 0, ie = fds.size(); i < ie; ++i) {
+    if (fds[i].fd == listen_fd) {
+      fds.erase(fds.begin() + i);
+      pollin.erase(pollin.begin() + i);
+      pollout.erase(pollout.begin() + i);
       break;
     }
   }
+  // for (auto it = fds.begin(); it != fds.end(); ++it) {
+  //   if (it->fd == listen_fd) {
+  //     fds.erase(it);
+  //     break;
+  //   }
+  // }
   listen_servers.erase(listen_fd);
 }
 
