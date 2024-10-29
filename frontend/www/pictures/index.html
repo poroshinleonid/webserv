@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<head>
+    <meta charset="utf-8">
+    <meta name="awesome webserver">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Here you can view/upload/remove pictures</h1>
+    <a href="/"><button type="button">🏠</button></a>
+    <div class="button-container">
+        <div class="button-item">
+            <a href="./view_pictures.py">
+                <button type="button">View</button>
+            </a>
+        </div>
+        <div class="button-item">
+            <form action="./upload_picture.py" method="post">
+                <input type="file" id="picture_upload" name="filename" required>
+                <button type="submit">Upload</button>
+            </form>
+        </div>
+        <div class="button-item">
+            <form action="" method="delete">
+                <input type="text" id="delete_filename" name="filename" required>
+                <button type="submit">Remove</button>
+            </form>
+        </div>
+    </div>
+    
+</body>

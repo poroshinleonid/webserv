@@ -1,0 +1,102 @@
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+/* Body styling */
+body {
+    background-color: #f4f7fa;
+    color: #333;
+    line-height: 1.6;
+    padding: 20px;
+}
+
+/* Headings */
+h1, h2, h3 {
+    color: #0056b3; /* A nice blue for headings */
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Paragraphs */
+p {
+    font-size: 1rem;
+    color: #666;
+    margin: 10px 0;
+    line-height: 1.8;
+}
+
+/* Links */
+a {
+    color: #ff4500;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #ff7300;
+    text-decoration: underline;
+}
+
+/* Container */
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.button-container {
+    display: flex;
+    justify-content: center; /* Center-aligns the buttons horizontally */
+    gap: 10px; /* Adds space between the buttons */
+    margin-top: 20px; /* Optional: adds some space above the buttons */
+}
+
+/* Buttons */
+button {
+    padding: 10px 20px;
+    font-size: 1rem;
+    color: #fff;
+    background-color: #0056b3;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #004494;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 10px;
+    font-size: 0.9rem;
+    color: #999;
+}
+
+.button-container {
+    display: flex;
+    justify-content: space-around; /* Ensures even spacing for each button-item */
+    gap: 20px; /* Adds more space between each item */
+    margin-top: 20px;
+}
+
+.button-item {
+    display: flex;
+    flex-direction: column; /* Keeps input field above button */
+    align-items: center;
+    gap: 8px; /* Adds space between the input and button */
+}
+
+.button-item form {
+    display: flex;
+    flex-direction: column; /* Ensures input field stays above button within form */
+    align-items: center;
+}
