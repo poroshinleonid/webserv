@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <climits>
 
 using std::string;
 using std::vector;
@@ -121,7 +122,7 @@ private:
   vector<string> values_found_;
 
 public:
-  const static int client_default_max_body_size = 1 << 15; // 32KB
+  const static int client_default_max_body_size = INT_MAX; // 32KB
 };
 
 class InvalidConfig : public std::runtime_error {

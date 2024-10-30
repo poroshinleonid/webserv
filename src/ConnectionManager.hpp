@@ -250,6 +250,8 @@ private:
   // system buffers
   char buffer[4096];     // REVISE is it the right size?
   char cgi_buffer[1024]; // REVISE is it the right size
+  std::vector<short> pollin;
+  std::vector<short> pollout;
 
 #define DEBUG
 #ifdef DEBUG
