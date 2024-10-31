@@ -74,6 +74,8 @@ public: // assign later
   std::string server_name;
   std::map<int, std::string> default_error_pages;
   size_t client_body_size;
+  static const int default_timeout = 10;
+  static const int default_cgi_timeout = 10;
 
 #define DEBUG
 #ifdef DEBUG

@@ -88,12 +88,18 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
 
 int ConnectionManager::start_server(Server &serv) {
   // get value safely
+  try {
   serv.timeout =
-      static_cast<double>(Libft::ft_atoi((*config)["timeout"].unwrap())) /
-      1000.0;
+      static_cast<double>(Libft::ft_atoi((*config)["timeout"].unwrap()));
+  } catch (...) {
+    serv.timeout = serv.default_timeout;
+  }
+  try {
   serv.cgi_timeout =
-      static_cast<double>(Libft::ft_atoi((*config)["cgi_timeout"].unwrap())) /
-      1000.0;
+      static_cast<double>(Libft::ft_atoi((*config)["cgi_timeout"].unwrap()));
+  } catch (...) {
+    serv.cgi_timeout = serv.default_cgi_timeout;
+  }
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
   if (new_listen_fd < 0) {
     std::string error = "socket(): can't create socket " + serv.host + ":" +
@@ -179,9 +185,9 @@ int ConnectionManager::run() {
   }
   while (!sig_stop) {
     int poll_result =
-        poll(fds.data(), fds.size(), 10); // REVISE:timeout from cfg?
+        poll(fds.data(), fds.size(), 10);
     if (poll_result == -1) {
-      return handle_poll_error(errno); // REVISE where is terminate()?
+      return handle_poll_error(errno);
     }
     if (poll_result == 0) {
       continue;
@@ -190,20 +196,25 @@ int ConnectionManager::run() {
       return -1;
     }
   }
-  // shutdown();
   return 0;
 }
 
 int ConnectionManager::cleanup(int fd) {
   (void)fd;
-  // if (connections[fd].is_cgi_running && cgi_timed_out(fd)) {
-  //   timeout_cgi(fd);
-  //   return 0;
-  // }
-  // if (conn_timed_out(fd)) {
-  //     close_connection(fd);
-  //   return 1;
-  // }
+  if (read_fd_to_sock.find(fd) != read_fd_to_sock.end()) {
+    return;
+  }
+  if (write_fd_to_sock.find(fd) != write_fd_to_sock.end()) {
+    return;
+  }
+  if (connections[fd].is_cgi_running && cgi_timed_out(fd)) {
+    timeout_and_kill_cgi(fd);
+    return 0;
+  }
+  if (conn_timed_out(fd)) {
+      close_connection(fd);
+    return 1;
+  }
   return 0;
 }
 
@@ -380,7 +391,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   connection.recv_done = true;
   pollin[find_fd_index(fd)] = FALS;
   if (response_string.empty() && connection.is_cgi_running == true) {
-   pollout[find_fd_index(fd)] = TRU; //FIX: if it is changed to TRU on cgi_finished, we can set if to FALS here
+    pollout[find_fd_index(fd)] = FALS;
     struct pollfd pollfd_read_s = {connection.cgi_pipe[0], POLLIN | POLLOUT, 0};
     fds.push_back(pollfd_read_s);
     pollin.push_back(TRU);
@@ -393,6 +404,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
     pollout.push_back(TRU);
     write_fd_to_sock[connection.cgi_pipe[1]] = fd;
     logger->log_info("Socket " + Libft::ft_itos(fd) + ": established cgi pipes: write to cgi in fd " + Libft::ft_itos(connection.cgi_pipe[1]) + ", read from cgi from fd " + Libft::ft_itos(connection.cgi_pipe[0]));
+    connection.update_last_cgi_activity();
     return true;
   }
   pollout[find_fd_index(fd)] = TRU;
@@ -446,7 +458,6 @@ bool ConnectionManager::handle_poll_write(int fd) {
   fds[find_fd_index(fd)].revents = 0;
   // if the connection timed out, we just close it
   if (conn_timed_out(fd)) {
-    std::cout << "3";
     close_connection(fd);
     return false;
   }
@@ -478,6 +489,8 @@ bool ConnectionManager::handle_poll_write(int fd) {
   if (bytes_sent < 0) {
     logger->log_error("send failed on socket" + Libft::ft_itos(fd));
     close_connection(fd);
+    return true;
+  } else if (bytes_sent == 0) {
     return true;
   }
   logger->log_info("Socket " + Libft::ft_itos(fd) + ": Sent " +
@@ -526,6 +539,7 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
     }
     // We are here if the cgi finished gracefully so we can read from its pipe
     connection.cgi_finished = true;
+    pollout[find_fd_index(connection.fd)] = TRU;
   }
   return read_cgi_pipe(connection);
 }
@@ -754,10 +768,11 @@ bool ConnectionManager::write_to_cgi(int fd) {
     connection.is_response_ready = true;
     close(connection.cgi_pipe[1]);
     kill_cgi(connection.fd);
-  }
-  if (bytes_written == CGI_BUF_SZ) {
+  } else if (bytes_written == 0) {
+    return true;
+  } else if (bytes_written == CGI_BUF_SZ) {
     connection.cgi_write_buffer.erase(0, CGI_BUF_SZ);
-  } else {
+  } else { // bytes_written < CGI_BUF_SZ
     connection.cgi_write_buffer.clear();
     close(connection.cgi_pipe[1]);
     pollout[find_fd_index(connection.fd)] = FALS;
