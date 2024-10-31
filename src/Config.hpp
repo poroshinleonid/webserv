@@ -62,6 +62,8 @@ public:
 
   Config(const Config& other);
 
+  Config& operator=(const Config& other);
+
   /**
    * @brief Checks if the key is present.
    *

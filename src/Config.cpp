@@ -29,6 +29,13 @@ Config::Config() : Config("{}", true) {}
 
 Config::Config(const Config& other): content_(other.content_) {}
 
+Config& Config::operator=(const Config& other) {
+  if (this != &other) {
+    content_ = other.content_;
+  }
+  return *this;
+}
+
 Config Config::operator[](const std::string &key) {
   try {
     get_value(key);
