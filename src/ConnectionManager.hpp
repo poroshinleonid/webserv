@@ -19,6 +19,8 @@
 #include <poll.h>
 #include <sys/socket.h>
 
+#define CGI_BUF_SZ 1024
+
 class ConnectionManager {
 private:
   ConnectionManager();
@@ -217,6 +219,8 @@ private:
 
   int handle_poll_error(int err_num);
   int find_fd_index(int system_fd);
+  bool write_to_cgi(int fd);
+
 
   // void sighandle(int signum);
 
@@ -230,26 +234,17 @@ private: // deprecated
   //   void update_last_cgi_activity(HttpConnection &connection);
 
 private:
-  // system data
   Config *config;
   Logger *logger;
-
-  // all fds for poll()
-  std::vector<struct pollfd> fds;
-
-  // connections with clients
+  std::vector<struct pollfd> fds;// all poll() fds
   std::map<int, HttpConnection> connections;
-
-  // listening servers
-  // std::vector<int> listen_fds;
   std::map<int, Server> listen_servers;
-
-  // CGI data
-  std::map<int, int> pipe_to_socket;
+  std::map<int, int> read_fd_to_sock; // (read-from pipe of cgi -> sock_fd related to cgi)
+  std::map<int, int> write_fd_to_sock; // (write-to pipe of cgi -> sock_fd related to cgi)
 
   // system buffers
   char buffer[4096];     // REVISE is it the right size?
-  char cgi_buffer[1024]; // REVISE is it the right size
+  char cgi_buffer[CGI_BUF_SZ]; // REVISE is it the right size
   std::vector<short> pollin;
   std::vector<short> pollout;
 

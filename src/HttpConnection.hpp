@@ -63,6 +63,7 @@ public:
   Server *serv;
   std::string recv_buffer;
   std::string send_buffer;
+  std::string cgi_write_buffer;
   HttpChunk chunked_chunk;
   std::string next_requests_str;
   time_t last_activity;

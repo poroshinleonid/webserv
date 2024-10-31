@@ -14,9 +14,9 @@
 
 bool is_request_finished(const std::string &request_str) {
   if (request_str.find("\r\n\r\n") != std::string::npos) {
-    if (request_str.find("Content-Length: ") != std::string::npos) {
+    if (request_str.find("content-length: ") != std::string::npos) {
       return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
-    } else if (request_str.find("Transfer-Encoding: chunked\r\n") != std::string::npos) {
+    } else if (request_str.find("transfer-encoding: chunked\r\n") != std::string::npos) {
       return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
     } else {
       return true;
@@ -26,7 +26,7 @@ bool is_request_finished(const std::string &request_str) {
 }
 
 bool check_chunked_transfer(const std::string &request_str) {
-  if (request_str.find("Transfer-Encoding: chunked\r\n") != std::string::npos && \
+  if (request_str.find("transfer-encoding: chunked\r\n") != std::string::npos && \
       request_str.find(CRLFCRLF) != std::string::npos) {
     return true;
   }
@@ -49,12 +49,15 @@ namespace fs = std::filesystem;
 
 response HttpHandle::compose_response(const std::string &request_str,
                                       Config &config, HttpConnection &connection) {
-                                        (void)connection;
+  Logger &log = *connection.logger;
   HttpRequest request;
   try {
     request = HttpRequest(request_str);
+  } catch(HttpRequest::UriTooLong &e) {
+    log.log_info("URI to long: " + std::string(e.what()));
+    return status_code_to_response(414, config /*dummy*/, false /*default*/);
   } catch (HttpRequest::BadRequest &e) {
-    std::cout << "Bad Request: " << e.what() << std::endl;
+    log.log_info("Bad Request: " + std::string(e.what()));
     return status_code_to_response(400, config /*dummy*/, false /*default*/);
   } catch (HttpRequest::RequestNotFinished &e) {
     if (std::string(e.what()) == "not chunked") {
@@ -66,36 +69,17 @@ response HttpHandle::compose_response(const std::string &request_str,
 
   bool is_keep_alive = false;
   try {
-    if (request.get_header_at("Connection") == "keep-alive") {
+    if (request.get_header_at("connection") == "keep-alive") {
       is_keep_alive = true;
     }
   } catch (...) { /*ignore*/
   }
 
-  //connection.recv_buffer
-  // long content_len =  -1;
-  // try {
-  //   content_len = Libft::ft_atoi(request.get_header_at("Content-Length"));
-  //   if (content_len > HttpRequest::MAX_BODY_SIZE) {
-  //     if (check_chunked_transfer(request_str)) {
-  //       connection.is_chunked_transfer = true;
-  //       connection.reading_garbage_chunks = true;
-  //       connection.recv_buffer.clear();
-  //     }
-  //     std::cout << "Oversized!"<<std::endl;
-  //     connection.close_after_send = true;
-  //     return status_code_to_response(413, config /*dummy*/, false);
-  //   }
-  // } catch (...) { /*ignore*/
-  // }
-  // if (request.get_body().size() > HttpRequest::MAX_BODY_SIZE) {
-  //   return status_code_to_response(413, config /*dummy*/, is_keep_alive);
-  // }
-
   try {
     request.get_host();
     request.get_port();
-  } catch (std::exception &) {
+  } catch (std::exception &e) {
+    std::cout << "host and port: " << e.what() << std::endl;
     return status_code_to_response(400, config /*dummy*/, is_keep_alive);
   }
 
@@ -112,7 +96,6 @@ response HttpHandle::compose_response(const std::string &request_str,
   try {
     url_config = select_url_config(url, server_config);
   } catch (std::exception &) {
-    std::cout << "404 2" << std::endl;
     return status_code_to_response(404, server_config, is_keep_alive);
   }
 
@@ -136,7 +119,6 @@ response HttpHandle::compose_response(const std::string &request_str,
                   [&req_method](const std::string &method) {
                     return method != req_method;
                   })) {
-    std::cout << "AAAAA 405 STATUS CODE on " << req_method << " " << url << std::endl;
     return status_code_to_response(405, server_config, is_keep_alive);
   }
 
@@ -170,7 +152,6 @@ response HttpHandle::compose_response(const std::string &request_str,
 
   fs::path path(object_path);
   if (!fs::exists(path)) {
-    std::cout << "404" << std::endl;
     return status_code_to_response(404, server_config, is_keep_alive);
   }
   if (fs::is_directory(path)) {
@@ -209,14 +190,19 @@ response HttpHandle::compose_response(const std::string &request_str,
   const std::string cgi_extension = ".py";
   try {
     if (path.extension() == cgi_extension) {
-      // prep_env(request);
+      response resp;
       std::cout << "Sending to CGI: " << request.get_body() << std::endl;
       if (request.get_method() == HttpRequest::Method::POST) {
-        return execute_cgi_response(object_path, request,
+        object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
+        resp = execute_cgi_response(object_path, request,
                                     is_keep_alive);
+        connection.cgi_write_buffer = std::move(request.get_body());
+        return resp;
       } else {
-        return execute_cgi_response(object_path, request, is_keep_alive);
-        // return execute_cgi_response(object_path, "", is_keep_alive);
+        resp = execute_cgi_response(object_path, request,
+                                    is_keep_alive); // execute_cgi_response(object_path, "", is_keep_alive);
+        connection.cgi_write_buffer = std::move(request.get_body());
+        return resp;
       }
     }
   } catch (std::runtime_error &e) {
@@ -335,9 +321,12 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
   std::cout << "FORK" << std::endl;
   int pid_t = fork();
   if (pid_t == -1) {
+    close(recv_pipe[0]);
+    close(recv_pipe[1]);
+    close(send_pipe[0]);
+    close(send_pipe[1]);
     throw std::runtime_error("Fork error");
-  }
-  if (pid_t == 0) {
+  } else if (pid_t == 0) { // we are inside the fork
     close(recv_pipe[0]);
     if (dup2(recv_pipe[1], STDOUT_FILENO) == -1) {
       std::cerr << "dup2 error\n";
@@ -362,18 +351,17 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     for (auto it = headers.begin(); it != headers.end(); it++) {
       std::string var_name;
       std::string var_value;
-      std::transform(it->first.begin(), it->first.end(), std::back_inserter(var_name), Libft::toupper);
-      std::transform(it->second.begin(), it->second.end(), std::back_inserter(var_value), Libft::toupper);
+      std::transform(it->first.begin(), it->first.end(), std::back_inserter(var_name), Libft::toenv);
+      std::transform(it->second.begin(), it->second.end(), std::back_inserter(var_value), Libft::toenv);
       std::string var_decl = var_name + "="  + var_value;
-      // std::cout << "Pushing to env: " << var_decl << std::endl;
-      envp.push_back(var_decl.c_str());
+      envp.push_back(std::move(var_decl.c_str()));
     }
     std::string tmp_s = "REQUEST_METHOD=" + HttpRequest::method_to_str(request.get_method());
-    envp.push_back(tmp_s.c_str());
+    envp.push_back(std::move(tmp_s.c_str()));
     std::string tmp_s2 = "SERVER_PROTOCOL=HTTP/1.1";
-    envp.push_back(tmp_s2.c_str());
+    envp.push_back(std::move(tmp_s2.c_str()));
     std::string tmp_s3 = "PATH_INFO=" + request.get_url();
-    envp.push_back(tmp_s3.c_str());
+    envp.push_back(std::move(tmp_s3.c_str()));
     envp.push_back(NULL);
     std::cerr << "EXECVE" << std::endl;
     if (execve(script_path.c_str(), const_cast<char* const*>(argv), const_cast<char* const*>(envp.data())) ==
@@ -383,19 +371,22 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     }
     exit(1);
   }
-
+  // pid != 0 - we are inside the parent
   close(send_pipe[0]);
-  if (arg.size() != 0) {
-    // FIX do in chunks?
-    // FIX check for -1 and kill if there's a problem.
-    write(send_pipe[1], arg.c_str(), arg.size()); // CGI hangs
-  }
-  close(send_pipe[1]);
+  #if 0
+    if (arg.size() != 0) {
+      // FIX do in chunks?
+      // FIX check for -1 and kill if there's a problem.
+      // write(send_pipe[1], arg.c_str(), arg.size()); // CGI hangs
+    }
+    close(send_pipe[1]);
+  #endif
   close(recv_pipe[1]);
   cgiResponse res;
   res.cgi_pid = pid_t;
   res.is_keep_alive = is_keep_alive;
   res.cgi_pipe[0] = recv_pipe[0];
+  res.cgi_pipe[1] = send_pipe[1];
   return res;
 }
 
@@ -602,33 +593,16 @@ response HttpHandle::delete_file_response(const std::string &url_path,
 }
 }; // namespace HttpHandle
 
-
+// TODO: (maybe) response to multiple requests
 std::string get_responses_string(HttpConnection &connection) {
-  // TODO: (maybe) response to multiple requests
-  // std::string request_str = connection.recv_stream.str();
-
-  std::string request_str = connection.recv_buffer;
-  std::cout << "Request to handle: [" << request_str << "]" << std::endl;
   Config config(*connection.config);
-  HttpHandle::response response;
-  if (false) {
-  // if (is_oversized(request_str)) {
-    if (check_chunked_transfer(request_str)) {
-      connection.is_chunked_transfer = true;
-      connection.reading_garbage_chunks = true;
-      connection.recv_buffer.clear();
-    }
-    std::cout << "Oversized!"<<std::endl;
-    connection.close_after_send = true;
-    response = HttpHandle::HttpHandle::status_code_to_response(413, config /*dummy*/, false);
-  } else {
-    response =
-      HttpHandle::HttpHandle::compose_response(request_str, config, connection);
-  }
+  Logger &log = *connection.logger;
+  std::string request_str = connection.recv_buffer;
+  log.log_debug("Current recv_buffer: [" + request_str + "]");
+  HttpHandle::response response = HttpHandle::HttpHandle::compose_response(request_str, config, connection);
   try {
     auto resp = std::get<HttpHandle::normalResponse>(response);
-    connection.recv_buffer = "";
-    // connection.recv_stream.str(std::string());
+    connection.recv_buffer.clear();
     connection.is_response_ready = true;
     connection.is_keep_alive = resp.is_keep_alive;
     return resp.response;
@@ -636,8 +610,8 @@ std::string get_responses_string(HttpConnection &connection) {
   }
   try {
     auto resp = std::get<HttpHandle::cgiResponse>(response);
-    connection.recv_buffer = "";
-    // connection.recv_stream.str(std::string());
+    // connection.cgi_write_buffer = std::move(connection.)
+    connection.recv_buffer.clear();
     connection.is_keep_alive = resp.is_keep_alive;
     connection.is_cgi_running = true;
     connection.cgi_finished = false;
@@ -657,3 +631,19 @@ std::string get_responses_string(HttpConnection &connection) {
   }
 }
 
+#if 0 // check if it is oversized right after loggind in get_responses_string;
+  if (false) {
+  // if (is_oversized(request_str)) {
+    if (check_chunked_transfer(request_str)) {
+      connection.is_chunked_transfer = true;
+      connection.reading_garbage_chunks = true;
+      connection.recv_buffer.clear();
+    }
+    std::cout << "Oversized!"<<std::endl;
+    connection.close_after_send = true;
+    response = HttpHandle::HttpHandle::status_code_to_response(413, config /*dummy*/, false);
+  } else {
+    response =
+      HttpHandle::HttpHandle::compose_response(request_str, config, connection);
+  }
+#endif
