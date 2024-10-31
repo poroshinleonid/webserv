@@ -1,5 +1,4 @@
-#ifndef HTTPCONNECTION_HPP
-#define HTTPCONNECTION_HPP
+#pragma once
 
 #include "Config.hpp"
 #include "Logger.hpp"
@@ -7,7 +6,6 @@
 
 #include <iostream>
 #include <map>
-#include <sstream>
 #include <string>
 #include <vector>
 
@@ -84,11 +82,6 @@ public:
   bool is_chunked_transfer;
   bool recv_done;
 
-#define DEBUG
-#ifdef DEBUG
 public:
   void print_connection();
-#endif
 };
-
-#endif // HTTPCONNECTION_HPP

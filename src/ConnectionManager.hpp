@@ -1,5 +1,4 @@
-#ifndef CONNECTIONMANAGER_HPP
-#define CONNECTIONMANAGER_HPP
+#pragma once
 
 #include "Config.hpp"
 #include "HttpConnection.hpp"
@@ -90,7 +89,7 @@ private:
    * @param fd
    * @return int
    */
-  int cleanup(int fd);
+  void cleanup(int fd);
 
   /**
    * @brief Go through pollfd vector after poll() returned positive value
@@ -243,15 +242,10 @@ private:
   std::map<int, int> write_fd_to_sock; // (write-to pipe of cgi -> sock_fd related to cgi)
 
   // system buffers
-  char buffer[BUF_SZ];     // REVISE is it the right size?
+  char buffer[BUF_SZ];
   std::vector<short> pollin;
   std::vector<short> pollout;
 
-#define DEBUG
-#ifdef DEBUG
 public:
   void print_connection_manager();
-#endif
 };
-
-#endif // CONNECTIONMANAGER_HPP

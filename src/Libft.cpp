@@ -21,7 +21,6 @@ Libft &Libft::operator=(const Libft &other) {
 
 int Libft::ft_atoi(const std::string &s) {
   return static_cast<int>(std::strtod(s.c_str(), NULL));
-  // return std::atoi(s.c_str());
 }
 
  char Libft::tolower(int c) {
@@ -47,31 +46,6 @@ int Libft::ft_atoi(const std::string &s) {
   }
   return c;
  }
-
-unsigned long Libft::ft_atoip(const std::string &s) {
-  unsigned long result;
-  // string_to_ip
-  inet_pton(AF_INET, s.c_str(), &result); // LIBFT forbidden function
-  return static_cast<unsigned long>(Config::string_to_ip(s));
-}
-
-std::string Libft::ft_iptoa(int ip_repr) {
-  int a, b, c, d;
-  std::ostringstream strm;
-  a = (ip_repr >> 24);
-  b = (ip_repr >> 16) & 0xFF;
-  c = (ip_repr >> 8) & 0xFF;
-  d = ip_repr & 0xFF;
-
-  strm << a;
-  strm << ".";
-  strm << b;
-  strm << ".";
-  strm << c;
-  strm << ".";
-  strm << d;
-  return strm.str();
-}
 
 std::string Libft::ft_itos(int number) {
   std::ostringstream strm;

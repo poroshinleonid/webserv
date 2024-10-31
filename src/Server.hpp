@@ -1,5 +1,4 @@
-#ifndef Server_HPP
-#define Server_HPP
+#pragma once
 
 #include <map>
 #include <netinet/in.h>
@@ -77,11 +76,9 @@ public: // assign later
   static const int default_timeout = 10;
   static const int default_cgi_timeout = 10;
 
-#define DEBUG
-#ifdef DEBUG
+
+
 public:
   void print_server();
-#endif
-};
 
-#endif
+};

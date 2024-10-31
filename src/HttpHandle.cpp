@@ -79,7 +79,6 @@ response HttpHandle::compose_response(const std::string &request_str,
     request.get_host();
     request.get_port();
   } catch (std::exception &e) {
-    std::cout << "host and port: " << e.what() << std::endl;
     return status_code_to_response(400, config /*dummy*/, is_keep_alive);
   }
 
@@ -156,7 +155,7 @@ response HttpHandle::compose_response(const std::string &request_str,
   }
   if (fs::is_directory(path)) {
     if (request.get_method() == HttpRequest::Method::DELETE) {
-      std::cerr << "Error: trying to DELETE a directory\n";
+      std::cerr << "[ERROR] trying to DELETE a directory\n";
       return status_code_to_response(403, server_config, is_keep_alive);
     }
     if (is_directory_listing) {
@@ -168,7 +167,7 @@ response HttpHandle::compose_response(const std::string &request_str,
   }
 
   if (!fs::is_regular_file(path)) {
-    std::cerr << "Error: " + object_path + " is not dir or regular file\n";
+    std::cerr << "[ERROR] " + object_path + " is not dir or regular file\n";
     return status_code_to_response(500, server_config,
                                    is_keep_alive); // TODO: idk if 500
   }
@@ -176,7 +175,7 @@ response HttpHandle::compose_response(const std::string &request_str,
   if (request.get_method() == HttpRequest::Method::DELETE) {
     bool was_removed = fs::remove(path);
     if (!was_removed) {
-      std::cerr << "Error: couldn't remove " + object_path + "\n";
+      std::cerr << "[ERROR] couldn't remove " + object_path + "\n";
       return status_code_to_response(500, server_config, is_keep_alive);
     }
     return delete_file_response(url, is_keep_alive);
@@ -184,7 +183,7 @@ response HttpHandle::compose_response(const std::string &request_str,
 
   std::ifstream file(object_path);
   if (!file.good()) {
-    std::cerr << "Error: couldn't read " << object_path << "\n";
+    std::cerr << "[ERROR] couldn't read " << object_path << "\n";
     return status_code_to_response(404, server_config, is_keep_alive);
   }
   const std::string cgi_extension = ".py";
@@ -234,7 +233,7 @@ response HttpHandle::file_response(const std::string &file_path,
                                    Config &server_config, bool is_keep_alive) {
   std::ifstream file(file_path);
   if (!file.good()) {
-    std::cerr << "Error: couldn't read " << file_path << "\n";
+    std::cerr << "[ERROR] couldn't read " << file_path << "\n";
     return status_code_to_response(404, server_config, is_keep_alive);
   }
   std::stringstream buffer;
@@ -373,14 +372,6 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
   }
   // pid != 0 - we are inside the parent
   close(send_pipe[0]);
-  #if 0
-    if (arg.size() != 0) {
-      // FIX do in chunks?
-      // FIX check for -1 and kill if there's a problem.
-      // write(send_pipe[1], arg.c_str(), arg.size()); // CGI hangs
-    }
-    close(send_pipe[1]);
-  #endif
   close(recv_pipe[1]);
   cgiResponse res;
   res.cgi_pid = pid_t;
@@ -455,7 +446,7 @@ Config HttpHandle::select_url_config(const std::string &url,
   }
   return selected;
 }
-
+#ifdef DEBUG
 void printve(const std::string &name, std::vector<std::string> &v) {
   std::cout << name << ": ";
   for (auto it = v.begin(); it != v.end(); ++it){
@@ -463,14 +454,13 @@ void printve(const std::string &name, std::vector<std::string> &v) {
   }
   std::cout << std::endl;
 }
+#endif
 
 std::string HttpHandle::compose_object_path(const std::string &url,
                                             const std::string &server_url,
                                             const std::string &root) {
   // replaces server_url to root in url
-  std::cout << "url: " << url << std::endl;
-  std::cout << "server_url: " << server_url << std::endl;
-  std::cout << "root: " << root << std::endl;
+
   std::vector<std::string> parsed_request_url = HttpRequest::parse_url(url);
   std::vector<std::string> parsed_server_url =
       HttpRequest::parse_url(server_url);
@@ -481,11 +471,16 @@ std::string HttpHandle::compose_object_path(const std::string &url,
                      parsed_request_url.begin() + parsed_server_url.size(),
                      parsed_request_url.end());
   std::string joined_result = HttpRequest::join_url(result_path);
+  #ifdef DEBUG
+  std::cout << "url: " << url << std::endl;
+  std::cout << "server_url: " << server_url << std::endl;
+  std::cout << "root: " << root << std::endl;
   printve("parsed_request_url", parsed_request_url);
   printve("parsed_server_url", parsed_server_url);
   printve("parsed_root", parsed_root);
   printve("result_path", result_path);
   std::cout << "joined_result: " << joined_result << std::endl;
+  #endif
   if (trim(root)[0] == '/') {
     joined_result = "/" + joined_result;
   }
@@ -596,9 +591,11 @@ response HttpHandle::delete_file_response(const std::string &url_path,
 // TODO: (maybe) response to multiple requests
 std::string get_responses_string(HttpConnection &connection) {
   Config config(*connection.config);
-  Logger &log = *connection.logger;
   std::string request_str = connection.recv_buffer;
+  #ifdef DEBUG
+  Logger &log = *connection.logger;
   log.log_debug("Current recv_buffer: [" + request_str + "]");
+  #endif
   HttpHandle::response response = HttpHandle::HttpHandle::compose_response(request_str, config, connection);
   try {
     auto resp = std::get<HttpHandle::normalResponse>(response);
@@ -626,8 +623,7 @@ std::string get_responses_string(HttpConnection &connection) {
     connection.is_chunked_transfer = resp.is_chunked_transfer;
     return "";
   } catch (std::bad_variant_access &) {
-    std::cerr << "You wouldn't have such problem in rust\n";
-    exit(1);
+    return "";
   }
 }
 

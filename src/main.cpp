@@ -7,10 +7,16 @@
 #include <string>
 #include <vector>
 
-#define DEBUG
-
 int main(int argc, char **argv) {
-  setvbuf(stdout, NULL, _IONBF, 0); // cout no buffer
+  // (void)argc;
+  // (void)argv;
+  // Config config(argv[1]);
+  // std::vector<Config> server_configs;
+  // server_configs = config.get_vec("server");
+  // for (size_t i = 0; i < server_configs.size(); i++) {
+  //   std::cout << "Host: " << server_configs[i]["host"].unwrap() << " -> " << Config::string_to_ip(server_configs[i]["host"].unwrap()) << std::endl;
+  // }
+  // return 0;
   if (argc != 2) {
     std::cout << "gib args (conf file)\n";
 
@@ -20,7 +26,9 @@ int main(int argc, char **argv) {
   Logger logger;
   ConnectionManager main_connection(&config, &logger);
   main_connection.setup();
+  #ifdef DEBUG
   main_connection.print_connection_manager();
+  #endif
   std::cout << "Running the webserv" << std::endl;
   if (main_connection.run() == -1) {
     std::cout << "Webserv died in a horrible way" << std::endl;

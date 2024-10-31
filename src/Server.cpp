@@ -43,7 +43,7 @@ Server &Server::operator=(const Server &other) {
   return *this;
 }
 
-#define DEBUG
-#ifdef DEBUG
+
+
 void Server::print_server() { std::cout << "*server*\n"; }
-#endif
+
