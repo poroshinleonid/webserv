@@ -19,7 +19,7 @@
 #include <poll.h>
 #include <sys/socket.h>
 
-#define CGI_BUF_SZ 1024
+#define BUF_SZ 8192
 
 class ConnectionManager {
 private:
@@ -243,8 +243,7 @@ private:
   std::map<int, int> write_fd_to_sock; // (write-to pipe of cgi -> sock_fd related to cgi)
 
   // system buffers
-  char buffer[4096];     // REVISE is it the right size?
-  char cgi_buffer[CGI_BUF_SZ]; // REVISE is it the right size
+  char buffer[BUF_SZ];     // REVISE is it the right size?
   std::vector<short> pollin;
   std::vector<short> pollout;
 

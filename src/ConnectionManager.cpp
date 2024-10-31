@@ -287,7 +287,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
     return true;
   }
   HttpConnection &connection = connections[fd];
-  // if cgi is still running, stop recv()ing from this socket until cgi is
+  // if cgi is still running, stop recv-ing from this socket until cgi is
   // either finished or timed out
   if (connection.is_cgi_running) {
     if (cgi_timed_out(fd)) {
@@ -307,9 +307,8 @@ bool ConnectionManager::handle_poll_read(int fd) {
     return false;
   }
 
-  char bufg[recv_chunk_sz + 1];
-  Libft::ft_memset(bufg, recv_chunk_sz + 1, 0);
-  int bytes_recvd = recv(fd, bufg, recv_chunk_sz, 0);
+  Libft::ft_memset(buffer, sizeof(buffer), 0);
+  int bytes_recvd = recv(fd, buffer, BUF_SZ - 1, 0);
   connection.update_last_activity();
   // No bytes recieved = cliend hangs up gracefully.
   if (bytes_recvd == 0) {
@@ -331,13 +330,13 @@ bool ConnectionManager::handle_poll_read(int fd) {
   // Negative bytes recieved = error
   if (bytes_recvd < 0) {
     logger->log_error("Socket " + Libft::ft_itos(fd) +
-                      ": recv() failed, closing the connection.");
+                      ": recv failed, closing the connection.");
     close_connection(fd);
     return true;
   }
   logger->log_info("Socket " + Libft::ft_itos(fd) + ": Recieved " +
                    Libft::ft_itos(bytes_recvd) + " bytes");
-  connection.recv_buffer.append(bufg);
+  connection.recv_buffer.append(buffer);
 
   std::string response_string;
   // if (connection.is_chunked_transfer == true) {
@@ -384,7 +383,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   // }
 
   response_string = get_responses_string(connection);
-  // this means not the whole request wasn't recv()-d yet
+  // this means not the whole request wasn't recv-d yet
   if (response_string.empty() && connection.is_cgi_running == false) {
     return true;
   }
@@ -546,20 +545,20 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
 
 // assumes poll() said we can read from the pipe!
 bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
-  int buf_len = sizeof(cgi_buffer);
+  int buf_len = sizeof(buffer);
   logger->log_info("Socket " + Libft::ft_itos(connection.fd) +
                    ": reading CGI pipe " +
                    Libft::ft_itos(connection.cgi_pipe[0]));
-  Libft::ft_memset(cgi_buffer, buf_len, 0);
+  Libft::ft_memset(buffer, buf_len, 0);
   int bytes_read;
   connection.update_last_cgi_activity();
-  bytes_read = read(connection.cgi_pipe[0], cgi_buffer, buf_len);
+  bytes_read = read(connection.cgi_pipe[0], buffer, buf_len - 1);
   // connection.send_buffer.append(cgi_buffer);
   // Libft::ft_memset(cgi_buffer, buf_len, 0);
   // FIX: INTERNAL SERVER ERROR should be a complete valid response.
   if (bytes_read < 0) {
     logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
-                      ": read() failed on CGI pipe " +
+                      ": read failed on CGI pipe " +
                       Libft::ft_itos(connection.cgi_pipe[0]));
     connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n";
     connection.is_response_ready = true;
@@ -761,7 +760,7 @@ bool ConnectionManager::write_to_cgi(int fd) {
   HttpConnection &connection = connections[write_fd_to_sock[fd]];
   Logger &log = *connection.logger;
   connection.update_last_cgi_activity();
-  int bytes_written = write(fd, connection.cgi_write_buffer.c_str(), CGI_BUF_SZ);
+  int bytes_written = write(fd, connection.cgi_write_buffer.c_str(), BUF_SZ);
   if (bytes_written < 0) {
     log.log_error("Can't send data to pipe" + Libft::ft_itos(fd));
     connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n";
@@ -770,9 +769,9 @@ bool ConnectionManager::write_to_cgi(int fd) {
     kill_cgi(connection.fd);
   } else if (bytes_written == 0) {
     return true;
-  } else if (bytes_written == CGI_BUF_SZ) {
-    connection.cgi_write_buffer.erase(0, CGI_BUF_SZ);
-  } else { // bytes_written < CGI_BUF_SZ
+  } else if (bytes_written == BUF_SZ) {
+    connection.cgi_write_buffer.erase(0, BUF_SZ);
+  } else { // bytes_written < BUF_SZ
     connection.cgi_write_buffer.clear();
     close(connection.cgi_pipe[1]);
     pollout[find_fd_index(connection.fd)] = FALS;
