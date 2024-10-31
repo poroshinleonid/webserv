@@ -21,6 +21,14 @@ public:
 
 public:
   /**
+   * @brief std::tolower
+   *
+   * @param s
+   * @return int
+   */
+  static char tolower(int c);
+
+  /**
    * @brief std::toupper
    *
    * @param s

@@ -23,6 +23,15 @@ int Libft::ft_atoi(const std::string &s) {
   return static_cast<int>(std::strtod(s.c_str(), NULL));
   // return std::atoi(s.c_str());
 }
+
+ char Libft::tolower(int c) {
+  if (c >= 'A' && c <= 'Z') {
+    c -= 'A';
+    c += 'a';
+  }
+  return c;
+ }
+
  char Libft::toupper(int c) {
   if (c >= 'a' && c <= 'z') {
     c -= 'a';
@@ -33,7 +42,7 @@ int Libft::ft_atoi(const std::string &s) {
 
  char Libft::toenv(int c) {
   c = toupper(c);
-  if (c == ' ') {
+  if (c == ' ' || c == '-') {
     c = '_';
   }
   return c;
