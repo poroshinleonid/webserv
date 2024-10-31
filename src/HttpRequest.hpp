@@ -57,4 +57,9 @@ public:
     RequestNotFinished(char const *const message) throw();
     virtual char const *what() const throw();
   };
+  class UriTooLong : std::runtime_error {
+  public:
+    UriTooLong(char const *const message) throw();
+    virtual char const *what() const throw();
+  };
 };

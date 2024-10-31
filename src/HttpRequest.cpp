@@ -1,7 +1,11 @@
 #include "HttpRequest.hpp"
 #include "Base.hpp"
+#include "Libft.hpp"
+#include <algorithm>
 
 using std::string, std::stringstream, std::unordered_map;
+
+#define MAX_URL_LEN 2000
 
 const std::array<std::string, 2> HttpRequest::allowedHttpVersions = {
     "HTTP/1.1", "HTTP/1.0"};
@@ -37,7 +41,13 @@ HttpRequest::HttpRequest(const string &s) {
   response_str_ = s;
   std::stringstream stream(s);
   std::string line;
-  getline_str(stream, line, CRLF);
+  if (!getline_str(stream, line, CRLF)) {
+    if (line.size() >= MAX_URL_LEN) {
+      throw UriTooLong("Uri in the header is too long");
+    }
+    throw RequestNotFinished("Not finished chunked request");
+  }
+  // getline_str(stream, line, CRLF);
   size_t method_end = line.find(SP);
   size_t url_start = method_end;
   for (; url_start < line.size() && line[url_start] == ' '; url_start++) {
@@ -57,10 +67,14 @@ HttpRequest::HttpRequest(const string &s) {
     if (line == "") {
       break;
     }
-    string key = trim(line.substr(0, line.find(":")));
+    string raw_key = trim(line.substr(0, line.find(":")));
+    string key = "";
+    std::transform(raw_key.begin(), raw_key.end(), std::back_inserter(key), Libft::tolower);
     string value = "";
+    string raw_value = "";
     if (line.find(":") != std::string::npos) {
-      value = trim(line.substr(line.find(":") + 1));
+      raw_value = trim(line.substr(line.find(":") + 1));
+      std::transform(raw_value.begin(), raw_value.end(), std::back_inserter(value), Libft::tolower);
     }
     headers_[key] = value;
   }
@@ -69,8 +83,8 @@ HttpRequest::HttpRequest(const string &s) {
   }
   header_ = s.substr(0, s.find(CRLFCRLF));
   std::string body;
-  if (headers_.find("Transfer-Encoding") != headers_.end() &&
-      headers_.at("Transfer-Encoding") == "chunked") {
+  if (headers_.find("transfer-encoding") != headers_.end() &&
+      headers_.at("transfer-encoding") == "chunked") {
     while (true) {
       std::string chunk_size_line;
       if (!getline_str(stream, chunk_size_line, CRLF)) {
@@ -134,13 +148,15 @@ string HttpRequest::get_body() const { return body_; }
 string HttpRequest::get_response_str() const { return response_str_; }
 
 string HttpRequest::get_host() const {
-  string host_full = get_header_at("Host");
+  string host_full = get_header_at("host");
+  std::cout << "HOST FULL ---------------: " << host_full << std::endl;
   std::vector<string> host_split = split_one(host_full, ':');
   return host_split.at(0);
 }
 
 int HttpRequest::get_port() const {
-  string host_full = get_header_at("Host");
+  string host_full = get_header_at("host");
+  std::cout << host_full << std::endl;
   std::vector<string> host_split = split_one(host_full, ':');
   if (host_split.size() < 2) {
     return 80;
@@ -178,6 +194,14 @@ HttpRequest::RequestNotFinished::RequestNotFinished(
     : std::runtime_error(message) {}
 
 char const *HttpRequest::RequestNotFinished::what() const throw() {
+  return std::runtime_error::what();
+}
+
+HttpRequest::UriTooLong::UriTooLong(
+    char const *const message) throw()
+    : std::runtime_error(message) {}
+
+char const *HttpRequest::UriTooLong::what() const throw() {
   return std::runtime_error::what();
 }
 
