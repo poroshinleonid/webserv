@@ -10,20 +10,21 @@
 #include <future>
 #include <thread>
 #include <unistd.h>
+#include <cerrno>
 
-
-bool is_request_finished(const std::string &request_str) {
-  if (request_str.find("\r\n\r\n") != std::string::npos) {
-    if (request_str.find("content-length: ") != std::string::npos) {
-      return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
-    } else if (request_str.find("transfer-encoding: chunked\r\n") != std::string::npos) {
-      return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
-    } else {
-      return true;
-    }
-  }
-  return false;
-}
+// not used
+// bool is_request_finished(const std::string &request_str) {
+//   if (request_str.find("\r\n\r\n") != std::string::npos) {
+//     if (request_str.find("content-length: ") != std::string::npos) {
+//       return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
+//     } else if (request_str.find("transfer-encoding: chunked\r\n") != std::string::npos) {
+//       return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
+//     } else {
+//       return true;
+//     }
+//   }
+//   return false;
+// }
 
 bool check_chunked_transfer(const std::string &request_str) {
   if (request_str.find("transfer-encoding: chunked\r\n") != std::string::npos && \
@@ -184,8 +185,14 @@ response HttpHandle::compose_response(const std::string &request_str,
 
   std::ifstream file(object_path);
   if (!file.good()) {
-    std::cerr << "Error: couldn't read " << object_path << "\n";
-    return status_code_to_response(404, server_config, is_keep_alive);
+    if (errno == EACCES) {
+      return status_code_to_response(403, server_config, is_keep_alive);
+    } else if (errno == ENOENT) {
+      return status_code_to_response(404, server_config, is_keep_alive);
+    } else {
+      std::cerr << "Error: something wrong with file: " << object_path << ", errno: " << errno << "\n";
+      return status_code_to_response(500, server_config, is_keep_alive);
+    }
   }
   const std::string cgi_extension = ".py";
   try {
@@ -196,12 +203,12 @@ response HttpHandle::compose_response(const std::string &request_str,
         object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive);
-        connection.cgi_write_buffer = std::move(request.get_body());
+        connection.cgi_write_buffer = request.get_body();
         return resp;
       } else {
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive); // execute_cgi_response(object_path, "", is_keep_alive);
-        connection.cgi_write_buffer = std::move(request.get_body());
+        connection.cgi_write_buffer = request.get_body();
         return resp;
       }
     }
@@ -234,8 +241,14 @@ response HttpHandle::file_response(const std::string &file_path,
                                    Config &server_config, bool is_keep_alive) {
   std::ifstream file(file_path);
   if (!file.good()) {
-    std::cerr << "Error: couldn't read " << file_path << "\n";
-    return status_code_to_response(404, server_config, is_keep_alive);
+    if (errno == EACCES) {
+      return status_code_to_response(403, server_config, is_keep_alive);
+    } else if (errno == ENOENT) {
+      return status_code_to_response(404, server_config, is_keep_alive);
+    } else {
+      std::cerr << "Error: something wrong with file: " << file_path << ", errno: " << errno << "\n";
+      return status_code_to_response(500, server_config, is_keep_alive);
+    }
   }
   std::stringstream buffer;
   buffer << file.rdbuf();
