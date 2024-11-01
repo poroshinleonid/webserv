@@ -190,9 +190,11 @@ response HttpHandle::compose_response(const std::string &request_str,
   try {
     if (path.extension() == cgi_extension) {
       response resp;
+      #ifdef DEBUG
       std::cout << "Sending to CGI: " << request.get_body() << std::endl;
+      #endif
       if (request.get_method() == HttpRequest::Method::POST) {
-        object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
+        // object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive);
         connection.cgi_write_buffer = std::move(request.get_body());
@@ -317,7 +319,6 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     std::cerr << "Pipe error\n";
     throw std::runtime_error("Pipe error");
   }
-  std::cout << "FORK" << std::endl;
   int pid_t = fork();
   if (pid_t == -1) {
     close(recv_pipe[0]);
@@ -333,7 +334,6 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
       exit(1);
     }
     close(recv_pipe[1]);
-    close(send_pipe[1]);
     if (dup2(send_pipe[0], STDIN_FILENO) == -1) {
       std::cerr << "dup2 error\n";
       close(send_pipe[0]);
@@ -362,7 +362,6 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     std::string tmp_s3 = "PATH_INFO=" + request.get_url();
     envp.push_back(std::move(tmp_s3.c_str()));
     envp.push_back(NULL);
-    std::cerr << "EXECVE" << std::endl;
     if (execve(script_path.c_str(), const_cast<char* const*>(argv), const_cast<char* const*>(envp.data())) ==
         -1) { // TODO: how to write the whole response instead of script output
       std::cerr << "Error executing cgi\n";

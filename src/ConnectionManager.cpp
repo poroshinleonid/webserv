@@ -591,11 +591,9 @@ void ConnectionManager::kill_cgi(int connection_fd) {
 
   int read_pipe = connections[connection_fd].cgi_pipe[0];
   pollin.erase(pollin.begin() + find_fd_index(read_pipe));
-  pollin.erase(pollin.begin() + find_fd_index(read_pipe));
   fds.erase(fds.begin() + find_fd_index(read_pipe));
 
   int write_pipe = connections[connection_fd].cgi_pipe[1];
-  pollin.erase(pollin.begin() + find_fd_index(write_pipe));
   pollin.erase(pollin.begin() + find_fd_index(write_pipe));
   fds.erase(fds.begin() + find_fd_index(write_pipe));
 
@@ -681,7 +679,7 @@ bool ConnectionManager::write_to_cgi(int fd) {
   HttpConnection &connection = connections[write_fd_to_sock[fd]];
   Logger &log = *connection.logger;
   connection.update_last_cgi_activity();
-  int bytes_written = write(fd, connection.cgi_write_buffer.c_str(), BUF_SZ);
+  int bytes_written = write(fd, connection.cgi_write_buffer.c_str(), connection.cgi_write_buffer.size());
   if (bytes_written < 0) {
     log.log_error("Can't send data to pipe" + Libft::ft_itos(fd));
     connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n";
@@ -690,8 +688,8 @@ bool ConnectionManager::write_to_cgi(int fd) {
     kill_cgi(connection.fd);
   } else if (bytes_written == 0) {
     return true;
-  } else if (bytes_written == BUF_SZ) {
-    connection.cgi_write_buffer.erase(0, BUF_SZ);
+  } else if (bytes_written < static_cast<int>(connection.cgi_write_buffer.size())) {
+    connection.cgi_write_buffer.erase(0, bytes_written);
   } else { // bytes_written < BUF_SZ
     connection.cgi_write_buffer.clear();
     close(connection.cgi_pipe[1]);
