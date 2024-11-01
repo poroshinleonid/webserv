@@ -377,8 +377,8 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     envp.push_back(NULL);
     if (execve(script_path.c_str(), const_cast<char* const*>(argv), const_cast<char* const*>(envp.data())) ==
         -1) { // TODO: how to write the whole response instead of script output
-      std::cerr << "Error executing cgi\n";
-      exit(1);
+      Config temp_cfg;
+      return status_code_to_response(500, temp_cfg, is_keep_alive);
     }
     exit(1);
   }
