@@ -142,8 +142,6 @@ HttpChunk HttpConnection::parse_http_chunk() {
 }
 
 
-#define DEBUG
-#ifdef DEBUG
 void HttpConnection::print_connection() {
   std::cout << "{";
   std::cout << fd << " ";
@@ -171,4 +169,3 @@ void HttpConnection::print_connection() {
   std::cout << recv_done << " ";
   std::cout << "}";
 }
-#endif

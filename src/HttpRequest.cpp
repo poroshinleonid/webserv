@@ -149,14 +149,12 @@ string HttpRequest::get_response_str() const { return response_str_; }
 
 string HttpRequest::get_host() const {
   string host_full = get_header_at("host");
-  std::cout << "HOST FULL ---------------: " << host_full << std::endl;
   std::vector<string> host_split = split_one(host_full, ':');
   return host_split.at(0);
 }
 
 int HttpRequest::get_port() const {
   string host_full = get_header_at("host");
-  std::cout << host_full << std::endl;
   std::vector<string> host_split = split_one(host_full, ':');
   if (host_split.size() < 2) {
     return 80;
