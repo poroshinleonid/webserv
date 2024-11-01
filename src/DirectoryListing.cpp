@@ -49,13 +49,17 @@ HttpHandle::directory_listing_html(const std::string &root_path,
 )";
   const std::string root_placeholded = "<!--root-->";
   const std::string leaf_placeholded = "<!--leaf-->";
-  assert(html.find(root_placeholded) != html.size());
-  assert(html.find(leaf_placeholded) != html.size());
+  assert(html.find(root_placeholded) != std::string::npos);
+  assert(html.find(leaf_placeholded) != std::string::npos);
   const std::string root_str =
       "<div class=\"root\">Index of " + root_path + "</div>";
+  std::string root_path_ext = root_path;
+  if (*(root_path.end() - 1) != '/') {
+    root_path_ext += "/";
+  }
   html.replace(html.find(root_placeholded), root_placeholded.size(), root_str);
-  auto make_leaf = [](const std::string &leaf) {
-    return "<div class=\"leaf\"><a href=\"" + leaf + "\">" + leaf +
+  auto make_leaf = [&root_path_ext](const std::string &leaf) {
+    return "<div class=\"leaf\"><a href=\"" + root_path_ext + leaf + "\">" + leaf +
            "</a></div>\n";
   };
   std::string leaf_str;
