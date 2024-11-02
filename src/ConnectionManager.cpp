@@ -698,11 +698,10 @@ bool ConnectionManager::write_to_cgi(int fd) {
     }
     // waitpid returned 0  means CGI is still running
     if (connection.cgi_result != 0) {
-      write(1, "e", 1);
-    connection.cgi_write_buffer.clear();
-    pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
-    connection.update_last_cgi_activity();
-    return false;
+      connection.cgi_write_buffer.clear();
+      pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
+      connection.update_last_cgi_activity();
+      return false;
     }
   int bytes_written = write(fd, connection.cgi_write_buffer.c_str(), connection.cgi_write_buffer.size());
   std::cerr << "Written: " << bytes_written << std::endl;
