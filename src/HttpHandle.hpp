@@ -10,6 +10,7 @@
 #include <variant>
 
 std::string get_responses_string(HttpConnection &connection);
+std::string status_code_to_string(int status_code);
 namespace HttpHandle {
 
 struct normalResponse {
@@ -37,8 +38,6 @@ public:
   static response status_code_to_response(int status_code,
                                           Config &server_config,
                                           bool is_keep_alive);
-
-
 private:
   static Config
   select_server_config(const HttpRequest &request,

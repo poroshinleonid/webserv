@@ -464,7 +464,7 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
       return false;
     }
     // waitpid returned not cgi pid - should hever happen
-    if (connection.cgi_result != connection.cgi_pid) {
+    if (connection.cgi_result != connection.cgi_pid && connection.cgi_result != 0) {
       kill_cgi(connection.fd);
       logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
                         ": Waitpid returned garbage pid from cgi pipe #" +
@@ -474,7 +474,7 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
     if (!WIFEXITED(status_code)) {
       logger->log_error("CGI not exited properly idk");
       kill_cgi(connection.fd);
-      connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n";
+      connection.send_buffer = status_code_to_string(500);
       connection.is_cgi_running = false;
       connection.is_response_ready = true;
       return false;
@@ -500,7 +500,7 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
     logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
                       ": read failed on CGI pipe " +
                       Libft::ft_itos(connection.cgi_pipe[0]));
-    connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n";
+    connection.send_buffer = status_code_to_string(500);
     connection.is_response_ready = true;
     kill_cgi(connection.fd);
     return true;
@@ -514,7 +514,7 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
       connection.send_buffer.replace(index, 7, "HTTP/1.1 ", 9);
     }
     if (connection.send_buffer.size() == 0) {
-      connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n"; // CGI returned nothing for some reason
+      connection.send_buffer = status_code_to_string(500); // CGI returned nothing for some reason
     }
   }  else { // bytes_read < buf_len
     connection.send_buffer.append(buffer);
@@ -609,7 +609,7 @@ void ConnectionManager::kill_cgi(int connection_fd) {
 void ConnectionManager::timeout_and_kill_cgi(int connection_fd) {
   logger->log_warning("CGI timed out, killing " + Libft::ft_itos(connection_fd));
   kill_cgi(connection_fd);
-  connections[connection_fd].send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n";
+  connections[connection_fd].send_buffer = status_code_to_string(500);
   connections[connection_fd].is_cgi_running = false;
   connections[connection_fd].is_response_ready = true;
 }
@@ -679,20 +679,48 @@ bool ConnectionManager::write_to_cgi(int fd) {
   HttpConnection &connection = connections[write_fd_to_sock[fd]];
   Logger &log = *connection.logger;
   connection.update_last_cgi_activity();
+    int status_code;
+    connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
+    if (connection.cgi_result != connection.cgi_pid && connection.cgi_result != 0) {
+      kill_cgi(connection.fd);
+      logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
+                        ": Waitpid returned garbage pid from cgi pipe #" +
+                        Libft::ft_itos(connection.fd));
+      return false;
+    }
+    if (!WIFEXITED(status_code) || WEXITSTATUS(status_code) != 0) {
+      logger->log_error("CGI not exited properly");
+      kill_cgi(connection.fd);
+      connection.send_buffer = 
+      connection.is_cgi_running = false;
+      connection.is_response_ready = true;
+      return false;
+    }
+    // waitpid returned 0  means CGI is still running
+    if (connection.cgi_result != 0) {
+      write(1, "e", 1);
+    connection.cgi_write_buffer.clear();
+    pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
+    connection.update_last_cgi_activity();
+    return false;
+    }
   int bytes_written = write(fd, connection.cgi_write_buffer.c_str(), connection.cgi_write_buffer.size());
+  std::cerr << "Written: " << bytes_written << std::endl;
   if (bytes_written < 0) {
     log.log_error("Can't send data to pipe" + Libft::ft_itos(fd));
-    connection.send_buffer = "HTTP/1.1 500 Internal server error\r\n\r\n";
+    connection.send_buffer = status_code_to_string(500);
     connection.is_response_ready = true;
-    close(connection.cgi_pipe[1]);
+    // close(connection.cgi_pipe[1]);
     kill_cgi(connection.fd);
-  } else if (bytes_written == 0) {
-    return true;
+  } else if (bytes_written == 0 || connection.cgi_write_buffer.size() == 0) {
+    // close(connection.cgi_pipe[1]);
+    // close(connection.cgi_pipe[1]);
+    pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
   } else if (bytes_written < static_cast<int>(connection.cgi_write_buffer.size())) {
     connection.cgi_write_buffer.erase(0, bytes_written);
   } else { // bytes_written < BUF_SZ
     connection.cgi_write_buffer.clear();
-    close(connection.cgi_pipe[1]);
+    // close(connection.cgi_pipe[1]);
     pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
   }
   connection.update_last_cgi_activity();

@@ -376,9 +376,9 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     envp.push_back(std::move(tmp_s3.c_str()));
     envp.push_back(NULL);
     if (execve(script_path.c_str(), const_cast<char* const*>(argv), const_cast<char* const*>(envp.data())) ==
-        -1) { // TODO: how to write the whole response instead of script output
-      Config temp_cfg;
-      return status_code_to_response(500, temp_cfg, is_keep_alive);
+        -1) {
+      status_code_to_string(500);
+      exit(1);
     }
     exit(1);
   }
@@ -599,6 +599,11 @@ response HttpHandle::delete_file_response(const std::string &url_path,
                         .is_keep_alive = is_keep_alive};
 }
 }; // namespace HttpHandle
+
+std::string status_code_to_string(int status_code) {
+  Config dummy;
+  return std::get<HttpHandle::normalResponse>(HttpHandle::HttpHandle::status_code_to_response(status_code, dummy, false)).response;
+}
 
 // TODO: (maybe) response to multiple requests
 std::string get_responses_string(HttpConnection &connection) {
