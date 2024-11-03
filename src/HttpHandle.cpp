@@ -12,20 +12,6 @@
 #include <unistd.h>
 #include <cerrno>
 
-// not used
-// bool is_request_finished(const std::string &request_str) {
-//   if (request_str.find("\r\n\r\n") != std::string::npos) {
-//     if (request_str.find("content-length: ") != std::string::npos) {
-//       return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
-//     } else if (request_str.find("transfer-encoding: chunked\r\n") != std::string::npos) {
-//       return (request_str.find("\r\n\r\n", request_str.find("\r\n\r\n") + 4) != std::string::npos);
-//     } else {
-//       return true;
-//     }
-//   }
-//   return false;
-// }
-
 bool check_chunked_transfer(const std::string &request_str) {
   if (request_str.find("transfer-encoding: chunked\r\n") != std::string::npos && \
       request_str.find(CRLFCRLF) != std::string::npos) {

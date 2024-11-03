@@ -15,7 +15,8 @@
         </div>
         <div class="button-item">
             <form action="/pictures/upload_picture.py" method="post">
-                <input type="file" id="picture_upload" name="filename" required>
+                <input type="text" id="file_name" name="filename" placeholder="filename" required>
+                <input type="text" id="file_text" name="filetext" placeholder="text" required>
                 <button type="submit">Upload</button>
             </form>
         </div>
