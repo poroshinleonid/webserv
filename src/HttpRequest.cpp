@@ -62,9 +62,6 @@ HttpRequest::HttpRequest(const string &s) {
   if (s.find(CRLFCRLF) == std::string::npos && s.find("Transfer-Ecnoding") == std::string::npos) {
     throw RequestNotFinished("not chunked");
   }
-  if (method_ == Method::POST && s.find("Transfer-Ecnoding") == std::string::npos && s.find(CRLFCRLF, s.find(CRLFCRLF) + 1) == std::string::npos) {
-    throw RequestNotFinished("not chunked");
-  }
   while (true) {
     getline_str(stream, line, CRLF);
     if (line == "") {
