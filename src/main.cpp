@@ -8,15 +8,6 @@
 #include <vector>
 
 int main(int argc, char **argv) {
-  // (void)argc;
-  // (void)argv;
-  // Config config(argv[1]);
-  // std::vector<Config> server_configs;
-  // server_configs = config.get_vec("server");
-  // for (size_t i = 0; i < server_configs.size(); i++) {
-  //   std::cout << "Host: " << server_configs[i]["host"].unwrap() << " -> " << Config::string_to_ip(server_configs[i]["host"].unwrap()) << std::endl;
-  // }
-  // return 0;
   if (argc != 2) {
     std::cout << "gib args (conf file)\n";
 
@@ -24,6 +15,13 @@ int main(int argc, char **argv) {
   }
   Config config(argv[1]);
   Logger logger;
+  #ifdef DEBUG
+    logger.log_debug("test");
+    logger.log_info("test");
+    logger.log_warning("test");
+    logger.log_error("test");
+    std::cout << "test" << std::endl;
+  #endif
   ConnectionManager main_connection(&config, &logger);
   main_connection.setup();
   #ifdef DEBUG

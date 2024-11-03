@@ -2,6 +2,14 @@
 #include <iostream>
 #include <string>
 
+Modifier Creset(FG_DEFAULT);
+Modifier Cdefault(FG_DEFAULT);
+Modifier Cred(FG_RED);
+Modifier Cgreen(FG_GREEN);
+Modifier Cblue(FG_BLUE);
+Modifier Cpink(FG_MAGENTA);
+Modifier Cyellow(FG_YELLOW);
+
 Logger::Logger() : out_file_stream_(NULL) {}
 
 Logger::Logger(const std::string &log_file) {
@@ -22,25 +30,25 @@ Logger::~Logger() {
   }
 }
 
-void Logger::log(const std::string &log_lvl, const std::string &message) const {
-  std::cout << "[" << log_lvl << "] " << message << std::endl;
+void Logger::log(const std::string &log_lvl, const std::string &message, Modifier log_lvl_color=Cdefault, Modifier msg_color=Cdefault) const {
+  std::cout << log_lvl_color << "[" << log_lvl << "] " << Creset << msg_color << message << Creset << std::endl;
   if (out_file_stream_ != NULL) {
     *out_file_stream_ << "[" << log_lvl << "] " << message << std::endl;
   }
 }
 
 void Logger::log_warning(const std::string &message) const {
-  log("WARNING", message);
+  log("WARNING", message, Cyellow, Cdefault);
 }
 
 void Logger::log_error(const std::string &message) const {
-  log("ERROR", message);
+  log("ERROR", message, Cred, Cyellow);
 }
 
 void Logger::log_info(const std::string &message) const {
-  log("INFO", message);
+  log("INFO", message, Cgreen, Cdefault);
 }
 
 void Logger::log_debug(const std::string &message) const {
-  log("DEBUG", message);
+  log("DEBUG", message, Cpink, Cdefault);
 }
