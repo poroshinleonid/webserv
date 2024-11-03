@@ -116,13 +116,7 @@ HttpRequest::HttpRequest(const string &s) {
       }
     }
   }
-  while (getline_str(stream, line, CRLF)) {
-    if (line == "") {
-      break;
-    }
-    body += line + '\n';
-  }
-  body_ = body;
+  body_ = s.substr(s.find(CRLFCRLF), s.find(CRLFCRLF, s.find(CRLFCRLF)));
 }
 
 HttpRequest::Method HttpRequest::get_method() const { return method_; }
