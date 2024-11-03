@@ -171,6 +171,8 @@ int ConnectionManager::run() {
     return 1;
   }
   while (!sig_stop) {
+    // std::cout << "poll()" << std::endl;
+    // write(1, "a", 1);
     int poll_result =
         poll(fds.data(), fds.size(), 10);
     if (poll_result == -1) {
@@ -342,13 +344,17 @@ bool ConnectionManager::handle_poll_read(int fd) {
     pollout.push_back(FALS);
     read_fd_to_sock[connection.cgi_pipe[0]] = fd;
 
+    // if (!connection.cgi_write_buffer.empty()) {
     struct pollfd pollfd_write_s = {connection.cgi_pipe[1], POLLIN | POLLOUT, 0};
     fds.push_back(pollfd_write_s);
     pollin.push_back(FALS);
     pollout.push_back(TRU);
     write_fd_to_sock[connection.cgi_pipe[1]] = fd;
-    logger->log_info("Socket " + Libft::ft_itos(fd) + ": established cgi pipes: write to cgi in fd " + Libft::ft_itos(connection.cgi_pipe[1]) + ", read from cgi from fd " + Libft::ft_itos(connection.cgi_pipe[0]));
+    logger->log_info("Socket " + Libft::ft_itos(fd) + ": established cgi pipes:  fd " + Libft::ft_itos(connection.cgi_pipe[1]) + ", read from cgi from fd " + Libft::ft_itos(connection.cgi_pipe[0]));
     connection.update_last_cgi_activity();
+    // } else {
+    //   logger->log_info("Socket " + Libft::ft_itos(fd) + ": established cgi pipe: read from cgi from fd " + Libft::ft_itos(connection.cgi_pipe[0]));
+    // }
     return true;
   }
   pollout[find_fd_index(fd)] = TRU;
@@ -619,24 +625,23 @@ void ConnectionManager::kill_cgi(int connection_fd, bool send_kill_sig) {
     kill(connections[connection_fd].cgi_pid, SIGKILL);
   }
   int read_pipe = connections[connection_fd].cgi_pipe[0];
-  int write_pipe = connections[connection_fd].cgi_pipe[1];
-
   close(read_pipe);
-  close(write_pipe);
-  
   pollin.erase(pollin.begin() + find_fd_index(read_pipe));
   fds.erase(fds.begin() + find_fd_index(read_pipe));
+  read_fd_to_sock.erase(connections[connection_fd].cgi_pipe[0]);
 
+  int write_pipe = connections[connection_fd].cgi_pipe[1];
+  if (write_pipe != -1) {
+  close(write_pipe);
   pollin.erase(pollin.begin() + find_fd_index(write_pipe));
   fds.erase(fds.begin() + find_fd_index(write_pipe));
-
-  read_fd_to_sock.erase(connections[connection_fd].cgi_pipe[0]);
   write_fd_to_sock.erase(connections[connection_fd].cgi_pipe[1]);
-  connections[connection_fd].is_cgi_running = false;
-  // pollout[find_fd_index(connection_fd)] =FALS;
-  // pollin[find_fd_index(connection_fd)] =TRU;
-
   logger->log_info("Killed CGI: Socket " + Libft::ft_itos(connection_fd) + ", read fd: " + Libft::ft_itos(read_pipe) + ", write fd: " + Libft::ft_itos(write_pipe));
+  } else {
+  logger->log_info("Killed CGI: Socket " + Libft::ft_itos(connection_fd) + ", read fd: " + Libft::ft_itos(read_pipe) + ", no write fd");
+  }
+
+  connections[connection_fd].is_cgi_running = false;
 }
 
 void ConnectionManager::timeout_and_kill_cgi(int connection_fd, bool send_kill_sig) {
@@ -713,15 +718,30 @@ bool ConnectionManager::cgi_write(int cgi_pid) {
   std::cerr << "Written: " << bytes_written << std::endl;
   if (bytes_written < 0) {
     logger->log_error("Can't send data to pipe" + Libft::ft_itos(cgi_pid));
+    close(connection.cgi_pipe[1]);
+    pollin.erase(pollin.begin() + find_fd_index(connection.cgi_pipe[1]));
+    fds.erase(fds.begin() + find_fd_index(connection.cgi_pipe[1]));
+    write_fd_to_sock.erase(connection.cgi_pipe[1]);
+    connection.cgi_pipe[1] = -1;
     kill_cgi_and_prep_to_send_500(connection.fd, true);
   } else if (bytes_written == 0 || connection.cgi_write_buffer.size() == 0) {
     //nothing to write to cgi, stop poll()ing the write pipe
     pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
+    close(connection.cgi_pipe[1]);
+    pollin.erase(pollin.begin() + find_fd_index(connection.cgi_pipe[1]));
+    fds.erase(fds.begin() + find_fd_index(connection.cgi_pipe[1]));
+    write_fd_to_sock.erase(connection.cgi_pipe[1]);
+    connection.cgi_pipe[1] = -1;
   } else if (bytes_written < static_cast<int>(connection.cgi_write_buffer.size())) {
     connection.cgi_write_buffer.erase(0, bytes_written);
   } else { // bytes_written < BUF_SZ
     connection.cgi_write_buffer.clear();
     pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
+    close(connection.cgi_pipe[1]);
+    pollin.erase(pollin.begin() + find_fd_index(connection.cgi_pipe[1]));
+    fds.erase(fds.begin() + find_fd_index(connection.cgi_pipe[1]));
+    write_fd_to_sock.erase(connection.cgi_pipe[1]);
+    connection.cgi_pipe[1] = -1;
   }
   return true;
 }

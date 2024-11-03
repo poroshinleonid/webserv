@@ -193,7 +193,8 @@ response HttpHandle::compose_response(const std::string &request_str,
       return status_code_to_response(500, server_config, is_keep_alive);
     }
   }
-  const std::string cgi_extension = ".py";
+  // const std::string cgi_extension = ".py";
+  const std::string cgi_extension = ".bla";
   try {
     if (path.extension() == cgi_extension) {
       response resp;
@@ -201,7 +202,7 @@ response HttpHandle::compose_response(const std::string &request_str,
       std::cout << "Sending to CGI: " << request.get_body() << std::endl;
       #endif
       if (request.get_method() == HttpRequest::Method::POST) {
-        // object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
+        object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive);
         connection.cgi_write_buffer = request.get_body();
@@ -209,7 +210,7 @@ response HttpHandle::compose_response(const std::string &request_str,
       } else {
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive); // execute_cgi_response(object_path, "", is_keep_alive);
-        connection.cgi_write_buffer = request.get_body();
+        connection.cgi_write_buffer = "";
         return resp;
       }
     }
@@ -340,19 +341,20 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     close(send_pipe[1]);
     throw std::runtime_error("Fork error");
   } else if (pid_t == 0) { // we are inside the fork
-    close(recv_pipe[0]);
     if (dup2(recv_pipe[1], STDOUT_FILENO) == -1) {
       std::cerr << "dup2 error\n";
       close(recv_pipe[1]);
       exit(1);
     }
-    close(recv_pipe[1]);
     if (dup2(send_pipe[0], STDIN_FILENO) == -1) {
       std::cerr << "dup2 error\n";
       close(send_pipe[0]);
       exit(1);
     }
+    close(recv_pipe[0]);
+    close(recv_pipe[1]);
     close(send_pipe[0]);
+    close(send_pipe[1]);
     std::string resp_s = request.get_response_str();
     const char *resp_c_str = resp_s.c_str();
     char *const argv[] = {const_cast<char *>(script_path.c_str()),
