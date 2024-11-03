@@ -357,7 +357,9 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     close(send_pipe[1]);
     std::string resp_s = request.get_response_str();
     const char *resp_c_str = resp_s.c_str();
-    char *const argv[] = {const_cast<char *>(script_path.c_str()),
+    const std::string CGI_PATH = "/usr/bin/python3";
+    char *const argv[] = { const_cast<char *>(CGI_PATH.c_str()),
+                          const_cast<char *>(script_path.c_str()),
                           const_cast<char *>(resp_c_str), NULL};
 
     auto headers = request.get_header_map();
@@ -377,7 +379,7 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     std::string tmp_s3 = "PATH_INFO=" + request.get_url();
     envp.push_back(std::move(tmp_s3.c_str()));
     envp.push_back(NULL);
-    if (execve(script_path.c_str(), const_cast<char* const*>(argv), const_cast<char* const*>(envp.data())) ==
+    if (execve(CGI_PATH.c_str(), const_cast<char* const*>(argv), const_cast<char* const*>(envp.data())) ==
         -1) {
       status_code_to_string(500);
       exit(1);
