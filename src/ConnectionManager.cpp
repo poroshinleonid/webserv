@@ -195,7 +195,7 @@ void ConnectionManager::cleanup(int fd) {
     return;
   }
   if (connections[fd].is_cgi_running && cgi_timed_out(fd)) {
-    timeout_and_kill_cgi(fd);
+    timeout_and_kill_cgi(fd, true);
     return;
   }
   if (conn_timed_out(fd)) {
@@ -257,7 +257,7 @@ void ConnectionManager::handle_revent_problem(int fd) {
   } else { // "Pipe-write fd "
     sock_fd = write_fd_to_sock[fd];
   }
-    kill_cgi(sock_fd);
+    kill_cgi(sock_fd, true);
     close_connection(sock_fd);
 }
 
@@ -281,7 +281,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   // either finished or timed out
   if (connection.is_cgi_running) {
     if (cgi_timed_out(fd)) {
-      timeout_and_kill_cgi(fd);
+      timeout_and_kill_cgi(fd, true);
     }
     return false;
   }
@@ -405,10 +405,10 @@ bool ConnectionManager::handle_poll_write(int fd) {
     return false;
   }
   // if the cgi timed out, we kill it and are ready to recieve
+  // FIX - prepare to send 500!
   if (connections[fd].is_cgi_running) {
     if (cgi_timed_out(fd)) {
-      std::cout << "2";
-      timeout_and_kill_cgi(fd);
+      timeout_and_kill_cgi(fd, true);
       pollout[find_fd_index(fd)] = FALS;
       pollin[find_fd_index(fd)] = TRU;
     }
@@ -454,39 +454,68 @@ bool ConnectionManager::handle_poll_write(int fd) {
   return true;
 }
 
+//rewrite based on write_to_cgi
 bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
-  // if the cgi has already finished, read from the pipe
-  if (!connection.cgi_finished) {
-    int status_code;
-    connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
-    // waitpid returned 0  means CGI is still running
-    if (connection.cgi_result == 0) {
-      return false;
-    }
-    // waitpid returned not cgi pid - should hever happen
-    if (connection.cgi_result != connection.cgi_pid && connection.cgi_result != 0) {
-      kill_cgi(connection.fd);
-      logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
-                        ": Waitpid returned garbage pid from cgi pipe #" +
-                        Libft::ft_itos(connection.fd));
-      return false;
-    }
-    if (!WIFEXITED(status_code)) {
-      logger->log_error("CGI not exited properly idk");
-      kill_cgi(connection.fd);
-      connection.send_buffer = status_code_to_string(500);
-      connection.is_cgi_running = false;
-      connection.is_response_ready = true;
-      return false;
-    }
-    // We are here if the cgi finished gracefully so we can read from its pipe
-    connection.cgi_finished = true;
-    pollout[find_fd_index(connection.fd)] = TRU;
+  // if the cgi has already been set to finished, read from the pipe
+  if (connection.cgi_finished) {
+    return read_cgi_pipe(connection);
   }
-  return read_cgi_pipe(connection);
+
+  int status_code;
+  connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
+  if (connection.cgi_result < 0) {
+    kill_cgi_and_prep_to_send_500(connection.fd, true);
+    return false;
+  }
+  if (connection.cgi_result == 0) { // CGI stil running
+    return read_cgi_pipe(connection);
+  }
+  if (connection.cgi_result != connection.cgi_pid && connection.cgi_result != 0) {
+    logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
+                      ": Waitpid returned garbage pid from cgi pipe #" +
+                      Libft::ft_itos(connection.fd));
+    kill_cgi_and_prep_to_send_500(connection.fd, true);
+  }
+
+  //If the CGI was terminated by exit()
+  if (WIFEXITED(status_code)) {
+    if (WEXITSTATUS(status_code) != 0) { // exit(0)
+      if (connection.send_buffer.empty()) {
+        // CGI exited before giving us a response
+        kill_cgi_and_prep_to_send_500(connection.fd, false);
+        return false;
+      } else {
+        // CGI exited and we have a response
+        kill_cgi(connection.fd, false);
+        connection.is_response_ready = true;
+        pollout[find_fd_index(connection.fd)] = TRU;
+        pollin[find_fd_index(connection.fd)] = FALS;
+        return false;
+      }
+    } else { //exit() != 0, prepare 500
+      kill_cgi_and_prep_to_send_500(connection.fd, false); 
+      return false;
+    }
+  } else {// !WIFEXITED(status_code) exit by signal or & C-Z in terminal
+    if (WIFSIGNALED(status_code)) {
+      logger->log_warning("CGI: exited with a signal" + Libft::ft_itos(WTERMSIG(status_code)));
+      kill_cgi_and_prep_to_send_500(connection.fd, false);
+    } else if (WIFSTOPPED(status_code)) {
+      logger->log_warning("CGI: WIFSTOPPED=true");
+      kill_cgi_and_prep_to_send_500(connection.fd, true);
+    } else if (WIFCONTINUED(status_code)) {
+      logger->log_warning("CGI: WIFCONTINUED=true");
+      kill_cgi_and_prep_to_send_500(connection.fd, true);
+    } else {
+      logger->log_warning("CGI: !WIFEXITED - unknown error");
+      kill_cgi_and_prep_to_send_500(connection.fd, true);
+    }
+    return false;
+  } 
 }
 
 // assumes poll() said we can read from the pipe!
+//rework like write_to_cgi
 bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
   int buf_len = sizeof(buffer);
   logger->log_info("Socket " + Libft::ft_itos(connection.fd) +
@@ -500,11 +529,9 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
     logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
                       ": read failed on CGI pipe " +
                       Libft::ft_itos(connection.cgi_pipe[0]));
-    connection.send_buffer = status_code_to_string(500);
-    connection.is_response_ready = true;
-    kill_cgi(connection.fd);
+    kill_cgi_and_prep_to_send_500(connection.fd, connection.is_cgi_running);
     return true;
-  }else if (bytes_read == buf_len) {
+  } else if (bytes_read == buf_len) { // read success, there's some more to read.
     connection.send_buffer.append(buffer);
     return true;
   } else if (bytes_read == 0) {
@@ -513,8 +540,9 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
     if (index != std::string::npos) {
       connection.send_buffer.replace(index, 7, "HTTP/1.1 ", 9);
     }
-    if (connection.send_buffer.size() == 0) {
-      connection.send_buffer = status_code_to_string(500); // CGI returned nothing for some reason
+    if (connection.send_buffer.size() == 0) {  // CGI returned nothing for some reason
+      kill_cgi_and_prep_to_send_500(connection.fd, connection.is_cgi_running);
+      return true;
     }
   }  else { // bytes_read < buf_len
     connection.send_buffer.append(buffer);
@@ -523,8 +551,9 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
       connection.send_buffer.replace(index, 7, "HTTP/1.1 ", 9);
     }
   }
-  std::cout << "Finished reading from CGI pipe, killing it: " << connection.send_buffer.size() << std::endl;
-  kill_cgi(connection.fd);
+  std::cout << "Finished reading from CGI pipe, killing it after reading " \
+            << connection.send_buffer.size() << " bytes" << std::endl;
+  kill_cgi(connection.fd, true);
   connection.is_cgi_running = false;
   connection.cgi_finished = true;
   connection.is_response_ready = true;
@@ -547,7 +576,7 @@ void ConnectionManager::close_connection(int fd) {
   }
   if (connections[fd].is_cgi_running == true) {
     logger->log_warning("closing the connection so killling the CGI");
-    kill_cgi(fd);
+    kill_cgi(fd, true);
   }
   for (size_t i = 0, ie = fds.size(); i < ie; ++i) {
     if (fds[i].fd == fd) {
@@ -585,33 +614,34 @@ bool ConnectionManager::cgi_timed_out(int fd) {
   return false;
 }
 
-void ConnectionManager::kill_cgi(int connection_fd) {
-  kill(connections[connection_fd].cgi_pid, SIGKILL);
-  close(connections[connection_fd].cgi_pipe[0]);
-
+void ConnectionManager::kill_cgi(int connection_fd, bool send_kill_sig) {
+  if (send_kill_sig) {
+    kill(connections[connection_fd].cgi_pid, SIGKILL);
+  }
   int read_pipe = connections[connection_fd].cgi_pipe[0];
+  int write_pipe = connections[connection_fd].cgi_pipe[1];
+
+  close(read_pipe);
+  close(write_pipe);
+  
   pollin.erase(pollin.begin() + find_fd_index(read_pipe));
   fds.erase(fds.begin() + find_fd_index(read_pipe));
 
-  int write_pipe = connections[connection_fd].cgi_pipe[1];
   pollin.erase(pollin.begin() + find_fd_index(write_pipe));
   fds.erase(fds.begin() + find_fd_index(write_pipe));
 
   read_fd_to_sock.erase(connections[connection_fd].cgi_pipe[0]);
   write_fd_to_sock.erase(connections[connection_fd].cgi_pipe[1]);
   connections[connection_fd].is_cgi_running = false;
-  pollout[find_fd_index(connection_fd)] =FALS;
-  pollin[find_fd_index(connection_fd)] =TRU;
+  // pollout[find_fd_index(connection_fd)] =FALS;
+  // pollin[find_fd_index(connection_fd)] =TRU;
 
   logger->log_info("Killed CGI: Socket " + Libft::ft_itos(connection_fd) + ", read fd: " + Libft::ft_itos(read_pipe) + ", write fd: " + Libft::ft_itos(write_pipe));
 }
 
-void ConnectionManager::timeout_and_kill_cgi(int connection_fd) {
+void ConnectionManager::timeout_and_kill_cgi(int connection_fd, bool send_kill_sig) {
   logger->log_warning("CGI timed out, killing " + Libft::ft_itos(connection_fd));
-  kill_cgi(connection_fd);
-  connections[connection_fd].send_buffer = status_code_to_string(500);
-  connections[connection_fd].is_cgi_running = false;
-  connections[connection_fd].is_response_ready = true;
+  kill_cgi_and_prep_to_send_500(connection_fd, send_kill_sig);
 }
 
 void ConnectionManager::shutdown_server(int listen_fd) {
@@ -675,55 +705,99 @@ int ConnectionManager::find_fd_index(int system_fd) {
       "The pollfd struct with the sought-after ->fd is not found");
 }
 
-bool ConnectionManager::write_to_cgi(int fd) {
-  HttpConnection &connection = connections[write_fd_to_sock[fd]];
-  Logger &log = *connection.logger;
+
+bool ConnectionManager::cgi_write(int cgi_pid) {
+  HttpConnection &connection = connections[write_fd_to_sock[cgi_pid]];
   connection.update_last_cgi_activity();
-    int status_code;
-    connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
-    if (connection.cgi_result != connection.cgi_pid && connection.cgi_result != 0) {
-      kill_cgi(connection.fd);
-      logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
-                        ": Waitpid returned garbage pid from cgi pipe #" +
-                        Libft::ft_itos(connection.fd));
-      return false;
-    }
-    if (!WIFEXITED(status_code) || WEXITSTATUS(status_code) != 0) {
-      logger->log_error("CGI not exited properly");
-      kill_cgi(connection.fd);
-      connection.send_buffer = 
-      connection.is_cgi_running = false;
-      connection.is_response_ready = true;
-      return false;
-    }
-    // waitpid returned 0  means CGI is still running
-    if (connection.cgi_result != 0) {
-      connection.cgi_write_buffer.clear();
-      pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
-      connection.update_last_cgi_activity();
-      return false;
-    }
-  int bytes_written = write(fd, connection.cgi_write_buffer.c_str(), connection.cgi_write_buffer.size());
+  int bytes_written = write(cgi_pid, connection.cgi_write_buffer.c_str(), connection.cgi_write_buffer.size());
   std::cerr << "Written: " << bytes_written << std::endl;
   if (bytes_written < 0) {
-    log.log_error("Can't send data to pipe" + Libft::ft_itos(fd));
-    connection.send_buffer = status_code_to_string(500);
-    connection.is_response_ready = true;
-    // close(connection.cgi_pipe[1]);
-    kill_cgi(connection.fd);
+    logger->log_error("Can't send data to pipe" + Libft::ft_itos(cgi_pid));
+    kill_cgi_and_prep_to_send_500(connection.fd, true);
   } else if (bytes_written == 0 || connection.cgi_write_buffer.size() == 0) {
-    // close(connection.cgi_pipe[1]);
-    // close(connection.cgi_pipe[1]);
+    //nothing to write to cgi, stop poll()ing the write pipe
     pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
   } else if (bytes_written < static_cast<int>(connection.cgi_write_buffer.size())) {
     connection.cgi_write_buffer.erase(0, bytes_written);
   } else { // bytes_written < BUF_SZ
     connection.cgi_write_buffer.clear();
-    // close(connection.cgi_pipe[1]);
     pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
   }
-  connection.update_last_cgi_activity();
   return true;
+}
+
+void ConnectionManager::kill_cgi_and_prep_to_send_500(int con_fd, bool send_kill_sig) {
+  HttpConnection &connection = connections[con_fd];
+  kill_cgi(con_fd, send_kill_sig);
+  connection.send_buffer = status_code_to_string(500);
+  connection.is_cgi_running = false;
+  connection.cgi_finished = true;
+  connection.is_response_ready = true;
+  pollout[find_fd_index(con_fd)] = TRU;
+  pollin[find_fd_index(con_fd)] = FALS;
+}
+
+bool ConnectionManager::write_to_cgi(int cgi_pid) {
+  HttpConnection &connection = connections[write_fd_to_sock[cgi_pid]];
+  int con_fd = connection.fd;
+  connection.update_last_cgi_activity();
+  int status_code;
+  connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
+  if (connection.cgi_result < 0) {
+    kill_cgi_and_prep_to_send_500(con_fd, true);
+    return false;
+  }
+  if (connection.cgi_result == 0) { // CGI stil running
+    return cgi_write(cgi_pid);
+  }
+  if (connection.cgi_result != connection.cgi_pid) {
+    logger->log_error("Socket " + Libft::ft_itos(connection.fd) +
+                      ": Waitpid returned garbage pid from cgi pipe #" +
+                      Libft::ft_itos(connection.fd));
+    kill_cgi_and_prep_to_send_500(con_fd, true);
+    return false;
+  }
+
+  //now the only remaining cgi_result is cgi_pid
+  //which means the CGI is no loger running. 
+  //Find out why and act accordingly
+
+
+  //If the CGI was terminated by exit()
+  if (WIFEXITED(status_code)) {
+    if (WEXITSTATUS(status_code) != 0) { // exit(0)
+      if (connection.send_buffer.empty()) {
+        // CGI exited before giving us a response
+        kill_cgi_and_prep_to_send_500(con_fd, false);
+        return false;
+      } else {
+        // CGI exited and we have a response
+        kill_cgi(con_fd, false);
+        connection.is_response_ready = true;
+        pollout[find_fd_index(con_fd)] = TRU;
+        pollin[find_fd_index(con_fd)] = FALS;
+        return false;
+      }
+    } else { 
+      kill_cgi_and_prep_to_send_500(con_fd, false); //exit() != 0, prepare 500
+      return false;
+    }
+  } else { // !WIFEXITED(status_code), exit by signal or & C-Z in terminal
+    if (WIFSIGNALED(status_code)) {
+      logger->log_warning("CGI: exited with a signal" + Libft::ft_itos(WTERMSIG(status_code)));
+      kill_cgi_and_prep_to_send_500(con_fd, false);
+    } else if (WIFSTOPPED(status_code)) {
+      logger->log_warning("CGI: WIFSTOPPED=true");
+      kill_cgi_and_prep_to_send_500(con_fd, true);
+    } else if (WIFCONTINUED(status_code)) {
+      logger->log_warning("CGI: WIFCONTINUED=true");
+      kill_cgi_and_prep_to_send_500(con_fd, true);
+    } else {
+      logger->log_warning("CGI: !WIFEXITED - unknown error");
+      kill_cgi_and_prep_to_send_500(con_fd, true);
+    }
+    return false;
+  }
 }
 
 

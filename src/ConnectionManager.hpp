@@ -180,7 +180,7 @@ private:
    *
    * @param fd
    */
-  void kill_cgi(int connection_fd);
+  void kill_cgi(int connection_fd, bool send_kill_sig);
 
   /**
    * @brief read a chunk of data from CGI
@@ -197,7 +197,7 @@ private:
    *
    * @param connection_fd
    */
-  void timeout_and_kill_cgi(int connection_fd);
+  void timeout_and_kill_cgi(int connection_fd, bool send_kill_sig);
 
   /**
    * @brief shutdown Server instance
@@ -219,6 +219,11 @@ private:
   int handle_poll_error(int err_num);
   int find_fd_index(int system_fd);
   bool write_to_cgi(int fd);
+
+  bool cgi_write(int cgi_pid);
+  void kill_cgi_and_prep_to_send_500(int con_fd, bool send_kill_sig);
+
+
 
 
   // void sighandle(int signum);
