@@ -194,7 +194,7 @@ response HttpHandle::compose_response(const std::string &request_str,
     }
   }
   // const std::string cgi_extension = ".py";
-  const std::string cgi_extension = ".bla";
+  const std::string cgi_extension = ".py";
   try {
     if (path.extension() == cgi_extension) {
       response resp;
@@ -202,14 +202,12 @@ response HttpHandle::compose_response(const std::string &request_str,
       std::cout << "Sending to CGI: " << request.get_body() << std::endl;
       #endif
       if (request.get_method() == HttpRequest::Method::POST) {
-        object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
+        // object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive);
         connection.cgi_write_buffer = request.get_body();
         return resp;
       } else {
-        connection.cgi_write_buffer = "";
-        return file_response(object_path, server_config, is_keep_alive);
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive); // execute_cgi_response(object_path, "", is_keep_alive);
         connection.cgi_write_buffer = "";
