@@ -208,6 +208,8 @@ response HttpHandle::compose_response(const std::string &request_str,
         connection.cgi_write_buffer = request.get_body();
         return resp;
       } else {
+        connection.cgi_write_buffer = "";
+        return file_response(object_path, server_config, is_keep_alive);
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive); // execute_cgi_response(object_path, "", is_keep_alive);
         connection.cgi_write_buffer = "";
