@@ -14,7 +14,6 @@ while True:
     except EOFError:
         break
 
-print(content, file=stderr)
 pat = re.compile(r"filename=(.*)&filetext=(.*)$", re.DOTALL)
 assert(pat.search(content))
 filename, filetext = pat.search(content).groups()
@@ -23,7 +22,7 @@ script_path = os.path.abspath(os.path.dirname(__file__))
 uploads_path = os.path.join(script_path, "uploads")
 file_path = os.path.join(uploads_path, filename)
 
-if os.path.exists(filename):
+if os.path.exists(file_path):
     print(exists_response)
     exit(0)
 

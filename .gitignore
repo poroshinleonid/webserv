@@ -49,3 +49,6 @@ client
 .DS_Store
 .vscode
 tempCodeRunnerFile.py
+
+# Webserv specific
+uploads
