@@ -61,8 +61,8 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
         Config::split_string(cfg.get_value_safely("server_name"));
     serv.client_max_body_size =
         Libft::ft_atoi(cfg.get_value_safely("client_max_body_size"));
-    if (serv.client_body_size == 0) {
-      serv.client_body_size = Config::client_default_max_body_size;
+    if (serv.client_max_body_size == 0) {
+      serv.client_max_body_size = Config::client_default_max_body_size;
     }
     return 0;
   } catch (std::exception &e) {

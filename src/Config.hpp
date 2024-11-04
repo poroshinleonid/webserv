@@ -124,7 +124,7 @@ private:
   vector<string> values_found_;
 
 public:
-  const static int client_default_max_body_size = INT_MAX; // 32KB
+  const static constexpr int client_default_max_body_size = (2 << 10) * (2 << 10) * 5; // 32KB
 };
 
 class InvalidConfig : public std::runtime_error {
