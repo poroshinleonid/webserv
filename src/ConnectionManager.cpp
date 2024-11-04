@@ -209,7 +209,6 @@ int ConnectionManager::handle_fds() {
   size_t pollvec_len = fds.size();
   for (size_t i = 0; i < pollvec_len; i++) {
     int fd = fds[i].fd;
-    // std::cout <<"[" << fd << "]" << std::flush;
     if (io_happened) {
       cleanup(fd);
     } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
@@ -224,7 +223,7 @@ int ConnectionManager::handle_fds() {
     }
     if (pollvec_len != fds.size()) {
       // one of fds was deleted we have no way to
-      // knof if it is b4 or after the current one so poll() again
+      // know if it is b4 or after the current one so poll() again
       break;
     }
   }
@@ -300,7 +299,6 @@ void ConnectionManager::handle_revent_problem(int fd) {
 
 bool ConnectionManager::handle_poll_read(int fd) {
   if (pollin[find_fd_index(fd)] == FALS) {
-    // logger->log_debug("POLLIN ON IGNORED FD " + Libft::ft_itos(fd));
     return false;
   }
   fds[find_fd_index(fd)].revents = 0;
@@ -460,10 +458,7 @@ bool ConnectionManager::handle_poll_write(int fd) {
   }
   int bytes_sent = send(fd, connections[fd].send_buffer.c_str(),
                         connections[fd].send_buffer.length(), 0);
-  #ifdef DEBUG
-  std::cout << "Normal response sent: " << connections[fd].send_buffer
-            << std::endl;
-  #endif
+  logger->log_debug("Data of the response sent: " + connections[fd].send_buffer);
   connections[fd].update_last_activity();
   // bytes_sent < 0 means error
   if (bytes_sent < 0) {
@@ -615,8 +610,8 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
         connection.send_buffer.append(suffix);
     }
   }
-  std::cout << "Finished reading from CGI pipe, killing it after reading " \
-            << connection.send_buffer.size() << " bytes" << std::endl;
+  logger->log_debug("Finished reading from CGI pipe, killing it after reading " + \
+                    Libft::ft_itos(connection.send_buffer.size()) + " bytes");
   kill_cgi(connection.fd, true);
   connection.is_cgi_running = false;
   connection.cgi_finished = true;

@@ -73,7 +73,7 @@ response HttpHandle::compose_response(const std::string &request_str,
   try {
     server_config = select_server_config(request, config);
   } catch (std::exception &e) {
-    std::cout << e.what() << std::endl;
+    log.log_warning(std::string("Select server config error: ") + std::string(e.what()));
     return status_code_to_response(404, config /*dummy*/, is_keep_alive);
   }
 
@@ -112,7 +112,7 @@ response HttpHandle::compose_response(const std::string &request_str,
   try {
     root = url_config["root"].unwrap();
   } catch (std::exception &) {
-    std::cerr << "Config error: no root\n";
+    log.log_error("Config error: no root");
     return status_code_to_response(500, server_config, is_keep_alive);
   }
 
@@ -120,7 +120,6 @@ response HttpHandle::compose_response(const std::string &request_str,
   try {
     server_url = url_config["url"].unwrap();
   } catch (...) {
-    std::cerr << "how did we get here\n";
     exit(1);
   }
 
@@ -142,7 +141,7 @@ response HttpHandle::compose_response(const std::string &request_str,
   }
   if (fs::is_directory(path)) {
     if (request.get_method() == HttpRequest::Method::DELETE) {
-      std::cerr << "[ERROR] trying to DELETE a directory\n";
+      log.log_warning("trying to DELETE a directory");
       return status_code_to_response(403, server_config, is_keep_alive);
     }
     if (is_directory_listing) {
@@ -154,7 +153,7 @@ response HttpHandle::compose_response(const std::string &request_str,
   }
 
   if (!fs::is_regular_file(path)) {
-    std::cerr << "[ERROR] " + object_path + " is not dir or regular file\n";
+    log.log_warning(object_path + " is not a dir or regular file");
     return status_code_to_response(500, server_config,
                                    is_keep_alive); // TODO: idk if 500
   }
@@ -162,7 +161,7 @@ response HttpHandle::compose_response(const std::string &request_str,
   if (request.get_method() == HttpRequest::Method::DELETE) {
     bool was_removed = fs::remove(path);
     if (!was_removed) {
-      std::cerr << "[ERROR] couldn't remove " + object_path + "\n";
+    log.log_warning("Couldn't remove " + object_path);
       return status_code_to_response(500, server_config, is_keep_alive);
     }
     return delete_file_response(url, is_keep_alive);
@@ -175,7 +174,7 @@ response HttpHandle::compose_response(const std::string &request_str,
     } else if (errno == ENOENT) {
       return status_code_to_response(404, server_config, is_keep_alive);
     } else {
-      std::cerr << "Error: something wrong with file: " << object_path << ", errno: " << errno << "\n";
+    log.log_warning("Something wrong with file: " + object_path + ", errno: " + Libft::ft_itos(errno));
       return status_code_to_response(500, server_config, is_keep_alive);
     }
   }
@@ -184,11 +183,8 @@ response HttpHandle::compose_response(const std::string &request_str,
   try {
     if (path.extension() == cgi_extension) {
       response resp;
-      #ifdef DEBUG
-      std::cout << "Sending to CGI: " << request.get_body() << std::endl;
-      #endif
+      log.log_debug("Sending to CGI: " + request.get_body());
       if (request.get_method() == HttpRequest::Method::POST) {
-        // object_path = "/mnt/d/code/webserv/ubuntu_cgi_tester";
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive);
         connection.cgi_write_buffer = request.get_body();
@@ -201,7 +197,7 @@ response HttpHandle::compose_response(const std::string &request_str,
       }
     }
   } catch (std::runtime_error &e) {
-    std::cerr << "[ERROR] CGI failed to fork properly" << std::endl;
+    log.log_error("CGI failed to fork properly");
     return status_code_to_response(500, server_config, is_keep_alive);
   }
   return file_response(object_path, server_config, is_keep_alive);
@@ -234,7 +230,7 @@ response HttpHandle::file_response(const std::string &file_path,
     } else if (errno == ENOENT) {
       return status_code_to_response(404, server_config, is_keep_alive);
     } else {
-      std::cerr << "Error: something wrong with file: " << file_path << ", errno: " << errno << "\n";
+      std::cerr << "[ERROR] Something wrong with file:" << file_path << ", errno: " << errno << std::endl;
       return status_code_to_response(500, server_config, is_keep_alive);
     }
   }
@@ -372,11 +368,12 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     }
     exit(1);
   }
-  std::cout <<"---------------------- " << pid_t << std::endl;
   // pid != 0 - we are inside the parent
   close(send_pipe[0]);
   close(recv_pipe[1]);
-  std::cout << "PIPES CREATED IN HANDLE: read=" << recv_pipe[0] << ", write=" << send_pipe[1] << std::endl;
+  #ifdef DEBUG
+  std::cout << "PIPES CREATED IN HANDLE: read=" << recv_pipe[0] << ", write=" << send_pipe[1] << ", pid=" << pid_t << std::endl;
+  #endif
   cgiResponse res;
   res.cgi_pid = pid_t;
   res.is_keep_alive = is_keep_alive;
@@ -450,15 +447,6 @@ Config HttpHandle::select_url_config(const std::string &url,
   }
   return selected;
 }
-#ifdef DEBUG
-void printve(const std::string &name, std::vector<std::string> &v) {
-  std::cout << name << ": ";
-  for (auto it = v.begin(); it != v.end(); ++it){
-    std::cout << *it << " ";
-  }
-  std::cout << std::endl;
-}
-#endif
 
 std::string HttpHandle::compose_object_path(const std::string &url,
                                             const std::string &server_url,
@@ -475,20 +463,9 @@ std::string HttpHandle::compose_object_path(const std::string &url,
                      parsed_request_url.begin() + parsed_server_url.size(),
                      parsed_request_url.end());
   std::string joined_result = HttpRequest::join_url(result_path);
-  #ifdef DEBUG
-  std::cout << "url: " << url << std::endl;
-  std::cout << "server_url: " << server_url << std::endl;
-  std::cout << "root: " << root << std::endl;
-  printve("parsed_request_url", parsed_request_url);
-  printve("parsed_server_url", parsed_server_url);
-  printve("parsed_root", parsed_root);
-  printve("result_path", result_path);
-  std::cout << "joined_result: " << joined_result << std::endl;
-  #endif
   if (trim(root)[0] == '/') {
     joined_result = "/" + joined_result;
   }
-  // std::cout << "path: " << joined_result << std::endl;
   return joined_result;
 }
 
@@ -601,10 +578,6 @@ std::string status_code_to_string(int status_code) {
 std::string get_responses_string(HttpConnection &connection) {
   Config config(*connection.config);
   std::string request_str = connection.recv_buffer;
-  #ifdef DEBUG
-  Logger &log = *connection.logger;
-  log.log_debug("Current recv_buffer: [" + request_str + "]");
-  #endif
   HttpHandle::response response = HttpHandle::HttpHandle::compose_response(request_str, config, connection);
   try {
     auto resp = std::get<HttpHandle::normalResponse>(response);
@@ -635,20 +608,3 @@ std::string get_responses_string(HttpConnection &connection) {
     return "";
   }
 }
-
-#if 0 // check if it is oversized right after loggind in get_responses_string;
-  if (false) {
-  // if (is_oversized(request_str)) {
-    if (check_chunked_transfer(request_str)) {
-      connection.is_chunked_transfer = true;
-      connection.reading_garbage_chunks = true;
-      connection.recv_buffer.clear();
-    }
-    std::cout << "Oversized!"<<std::endl;
-    connection.close_after_send = true;
-    response = HttpHandle::HttpHandle::status_code_to_response(413, config /*dummy*/, false);
-  } else {
-    response =
-      HttpHandle::HttpHandle::compose_response(request_str, config, connection);
-  }
-#endif

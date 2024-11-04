@@ -38,11 +38,11 @@ void Logger::log(const std::string &log_lvl, const std::string &message, Modifie
 }
 
 void Logger::log_warning(const std::string &message) const {
-  log("WARNING", message, Cyellow, Cdefault);
+  log("WARNING", message, Cyellow, Cyellow);
 }
 
 void Logger::log_error(const std::string &message) const {
-  log("ERROR", message, Cred, Cyellow);
+  log("ERROR", message, Cred, Cred);
 }
 
 void Logger::log_info(const std::string &message) const {
@@ -50,5 +50,8 @@ void Logger::log_info(const std::string &message) const {
 }
 
 void Logger::log_debug(const std::string &message) const {
-  log("DEBUG", message, Cpink, Cdefault);
+  (void)message;
+  #ifdef DEBUG
+    log("DEBUG", message, Cpink, Cdefault);
+  #endif
 }
