@@ -5,12 +5,7 @@ INCDIR := inc
 OBJDIR = bin
 TESTDIR := test
 
-# CPPFLAGS = -Wall -Wextra -Werror -std=c++17 -g -ggdb -fsanitize=undefined
-CPPFLAGS = -Wall -Wextra -Werror -std=c++17 -g -ggdb -fsanitize=address
-# CPPFLAGS = -Wall -Wextra -Werror -std=c++17 -g -ggdb
-# CPPFLAGS = -Wall -Wextra -Werror -std=c++17
-DEBUGFLAGS = -g -g -ggdb
-SANADDRFLAG = -fsanitize=address
+CPPFLAGS = -Wall -Wextra -Werror -std=c++17
 INC_FLAGS := -I ./$(INCDIR)
 
 MAINSOURCE := $(SRCDIR)/main.cpp
@@ -40,12 +35,6 @@ all: $(NAME)
 
 $(NAME): $(OBJECTS) $(SOURCES) $(MAINSOURCE)
 	$(CPP) $(CPPFLAGS) $(INC_FLAGS) $(OBJECTS) $(MAINSOURCE) -o $(NAME)
-
-debug: CPPFLAGS += $(DEBUGFLAGS)
-debug: all
-sanaddr: CPPFLAGS += $(SANADDRFLAG)
-sanaddr: debug all
-
 
 HEADERS = $(addprefix $(SRCDIR)/,$(SOURCE_FILES:.cpp=.hpp))
 format:

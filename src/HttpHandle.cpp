@@ -406,9 +406,6 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
   // pid != 0 - we are inside the parent
   close(send_pipe[0]);
   close(recv_pipe[1]);
-  #ifdef DEBUG
-  std::cout << "PIPES CREATED IN HANDLE: read=" << recv_pipe[0] << ", write=" << send_pipe[1] << ", pid=" << pid_t << std::endl;
-  #endif
   cgiResponse res;
   res.request_str_len = request.get_body().size() + request.get_header().size();
   res.request_str_len += 4; // CRLFCRLF
@@ -619,9 +616,6 @@ std::string get_responses_string(HttpConnection &connection) {
   try {
     auto resp = std::get<HttpHandle::normalResponse>(response);
     // not always clear(), remove header.size() + body.size() (also account for CRLFCRLF if we trimmed it)
-    #ifdef DEBUG
-    std::cout << "request_str: [" << connection.recv_buffer << "]" << std::endl;
-    #endif
     //here and lower:
     //remover only response_str_len characters
     //then check if we had trailing CRLFCRLF and remove them also
@@ -639,9 +633,6 @@ std::string get_responses_string(HttpConnection &connection) {
   } catch (std::bad_variant_access &) { /*ignore*/
   }
   try {
-    #ifdef DEBUG
-    std::cout << "request_str: [" << connection.recv_buffer << "]" << std::endl;
-    #endif
     auto resp = std::get<HttpHandle::cgiResponse>(response);
     //here and higher:
     //remover only response_str_len characters
