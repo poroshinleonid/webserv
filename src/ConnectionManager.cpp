@@ -360,7 +360,7 @@ bool ConnectionManager::handle_poll_read(int fd) {
   }
   logger->log_info("Socket " + Libft::ft_itos(fd) + ": Recieved " +
                    Libft::ft_itos(bytes_recvd) + " bytes");
-  connection.recv_buffer.append(buffer);
+  connection.recv_buffer.append(buffer, bytes_recvd);
 
   std::string response_string;
   response_string = get_responses_string(connection);

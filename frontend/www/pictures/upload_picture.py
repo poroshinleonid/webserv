@@ -1,57 +1,55 @@
 #!/usr/bin/env python3
 
-from sys import stderr
-import re
 import os
+import re
+import sys
 
-ok_response = "HTTP/1.1 200 OK\r\nContent-type: text/plain\r\nContent-length: 12\r\n\r\nuploaded\r\n\r\n"
-exists_response = "HTTP/1.1 200 OK\r\nContent-type: text/plain\r\nContent-length: 23\r\n\r\nfile already exists\r\n\r\n"
-filetext = []
+# Define HTTP responses
+ok_response = b"HTTP/1.1 200 OK\r\nContent-type: text/plain\r\nContent-length: 12\r\n\r\nuploaded\r\n\r\n"
+exists_response = b"HTTP/1.1 200 OK\r\nContent-type: text/plain\r\nContent-length: 23\r\n\r\nfile already exists\r\n\r\n"
+
+# Initialize variables
 filename = ""
+boundary = None
+file_content = b""
 
-def crlf_input() -> str:
-    line = input()
-    if line.endswith("\r"):
-        line = line[:-1]
-    return line
+# Read input as binary from stdin
+input_data = sys.stdin.buffer.read()
 
-# bound
-line = crlf_input()
-assert(line.startswith("----"))
+# Parse boundary from the first line
+first_line_end = input_data.find(b"\r\n")
+boundary = input_data[:first_line_end]
 
-# content-disposition
-line = crlf_input()
-assert(line.startswith("Content-Disposition"))
-filename_pat = re.compile(r'.*name="(.*?)".*')
-filename = filename_pat.match(line).groups()[0]
+# Locate and extract headers
+headers_end = input_data.find(b"\r\n\r\n", first_line_end) + 4
+headers = input_data[first_line_end+2:headers_end].decode()
 
-# content-type
-line = crlf_input()
-assert(line.startswith("Content-Type"))
+# Extract filename from Content-Disposition header
+filename_match = re.search(r'filename="(.+?)"', headers)
+if filename_match:
+    filename = filename_match.group(1)
+else:
+    print(b"HTTP/1.1 400 Bad Request\r\nContent-type: text/plain\r\n\r\nMissing filename\r\n")
+    sys.exit(1)
 
-# empty
-line = crlf_input()
-assert(line == "")
+# Extract file content after headers until the boundary
+file_start = headers_end
+file_end = input_data.rfind(boundary) - 2  # -2 to remove the trailing CRLF
+file_content = input_data[file_start:file_end]
 
-# file content
-while True:
-    try:
-        line = crlf_input()
-        filetext.append(line)
-    except EOFError:
-        break
-
-# last line should be boundry
-assert(filetext[-1].startswith("----"))
-filetext.pop()
-
+# Set up file paths
 script_path = os.path.abspath(os.path.dirname(__file__))
 uploads_path = os.path.join(script_path, "uploads")
 file_path = os.path.join(uploads_path, filename)
 
+# Check if file already exists
 if os.path.exists(file_path):
-    print(exists_response)
-    exit(0)
+    sys.stdout.buffer.write(exists_response)
+    sys.exit(0)
 
-open(file_path, 'w').write('\n'.join(filetext))
-print(ok_response)
+# Write the binary content to file
+with open(file_path, 'wb') as f:
+    f.write(file_content)
+
+# Send OK response
+sys.stdout.buffer.write(ok_response)
