@@ -24,7 +24,7 @@ def make_content():
     body = ""
     for abs_path in absolute_file_paths(uploads_path):
         extension = os.path.splitext(abs_path)[1]
-        if (extension not in ['.jpeg', '.jpg', '.png']):
+        if (extension not in ['.jpeg', '.jpg', '.png', '.gif']):
             continue
         body +=  f'<img src="./uploads/{os.path.basename(abs_path)}" width="100" height="100">'
     body = wrap_tag('body', body)
