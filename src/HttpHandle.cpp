@@ -343,7 +343,7 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     close(send_pipe[1]);
     std::string resp_s = request.get_response_str();
     const char *resp_c_str = resp_s.c_str();
-    const std::string CGI_PATH = "/usr/bin/python3 -u ";
+    const std::string CGI_PATH = "/usr/bin/python3";
     char *const argv[] = { const_cast<char *>(CGI_PATH.c_str()),
                           const_cast<char *>(script_path.c_str()),
                           const_cast<char *>(resp_c_str), NULL};
@@ -372,6 +372,7 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     }
     exit(1);
   }
+  std::cout <<"---------------------- " << pid_t << std::endl;
   // pid != 0 - we are inside the parent
   close(send_pipe[0]);
   close(recv_pipe[1]);
