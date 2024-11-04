@@ -6,17 +6,44 @@ import os
 
 ok_response = "HTTP/1.1 200 OK\r\nContent-type: text/plain\r\nContent-length: 12\r\n\r\nuploaded\r\n\r\n"
 exists_response = "HTTP/1.1 200 OK\r\nContent-type: text/plain\r\nContent-length: 23\r\n\r\nfile already exists\r\n\r\n"
-content = ""
+filetext = []
+filename = ""
 
+def crlf_input() -> str:
+    line = input()
+    if line.endswith("\r"):
+        line = line[:-1]
+    return line
+
+# bound
+line = crlf_input()
+assert(line.startswith("----"))
+
+# content-disposition
+line = crlf_input()
+assert(line.startswith("Content-Disposition"))
+filename_pat = re.compile(r'.*name="(.*?)".*')
+filename = filename_pat.match(line).groups()[0]
+
+# content-type
+line = crlf_input()
+assert(line.startswith("Content-Type"))
+
+# empty
+line = crlf_input()
+assert(line == "")
+
+# file content
 while True:
     try:
-        content += input()
+        line = crlf_input()
+        filetext.append(line)
     except EOFError:
         break
 
-pat = re.compile(r"filename=(.*)&filetext=(.*)$", re.DOTALL)
-assert(pat.search(content))
-filename, filetext = pat.search(content).groups()
+# last line should be boundry
+assert(filetext[-1].startswith("----"))
+filetext.pop()
 
 script_path = os.path.abspath(os.path.dirname(__file__))
 uploads_path = os.path.join(script_path, "uploads")
@@ -26,5 +53,5 @@ if os.path.exists(file_path):
     print(exists_response)
     exit(0)
 
-open(file_path, 'w').write(filetext)
+open(file_path, 'w').write('\n'.join(filetext))
 print(ok_response)

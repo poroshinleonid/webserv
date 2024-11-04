@@ -14,9 +14,8 @@
             </a>
         </div>
         <div class="button-item">
-            <form action="/pictures/upload_picture.py" method="post">
-                <input type="text" id="file_name" name="filename" placeholder="filename" required>
-                <input type="text" id="file_text" name="filetext" placeholder="text" required>
+            <form action="/pictures/upload_picture.py" method="post" enctype="multipart/form-data">
+                <input type="file" id="file_uploads" name="file_upload" required>
                 <button type="submit">Upload</button>
             </form>
         </div>
