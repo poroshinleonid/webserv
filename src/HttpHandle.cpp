@@ -54,6 +54,13 @@ response HttpHandle::compose_response(const std::string &request_str,
     }
   }
 
+  try {
+    if (std::stoi(request.get_header_at("content-length")) > connection.serv->client_max_body_size
+    || request.get_body().size() > static_cast<size_t>(connection.serv->client_max_body_size)) {
+      return status_code_to_response(413, config /* dummy */, false);
+    }
+  } catch (...) { /* ignore */}
+
   bool is_keep_alive = false;
   try {
     if (request.get_header_at("connection") == "keep-alive") {
