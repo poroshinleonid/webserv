@@ -78,12 +78,31 @@ HttpRequest::HttpRequest(const string &s) {
     }
     headers_[key] = value;
   }
+  #if 0
   if (method_ == Method::GET || method_ == Method::DELETE || method_ == Method::HEAD) {
     return;
   }
+  #endif
   header_ = s.substr(0, s.find(CRLFCRLF));
+
   std::string body;
-  if (headers_.find("transfer-encoding") != headers_.end() &&
+  size_t content_length;
+  if (headers_.find("content-length") != headers_.end()) {
+    std::cout << "Content-length found, reading the body, i.e. the content" << std::endl;
+    content_length = Libft::ft_atoi(headers_.at("content-length"));
+    size_t body_start = s.find(CRLFCRLF) + 4;
+    body_ = s.substr(body_start, s.size() - body_start);
+    if (body_.size() < content_length) {
+      throw RequestNotFinished("Not finished unchunked request");
+    } else if (body_.size() > content_length) {
+      body_ = body_.substr(0, content_length);
+      length_ = body_.size() + header_.size() + 4;
+      return;
+    } else { // content_length = body_.size()
+      length_ = body_.size() + header_.size() + 4;
+      return;
+    }
+  } else if (headers_.find("transfer-encoding") != headers_.end() &&
       headers_.at("transfer-encoding") == "chunked") {
     while (true) {
       std::string chunk_size_line;
@@ -115,8 +134,9 @@ HttpRequest::HttpRequest(const string &s) {
         body += c;
       }
     }
+  } else {
+    body_ = s.substr(s.find(CRLFCRLF), s.find(CRLFCRLF, s.find(CRLFCRLF)));
   }
-  body_ = s.substr(s.find(CRLFCRLF), s.find(CRLFCRLF, s.find(CRLFCRLF)));
 }
 
 HttpRequest::Method HttpRequest::get_method() const { return method_; }

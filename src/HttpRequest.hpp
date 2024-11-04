@@ -45,6 +45,8 @@ private:
   string body_;
   string header_;
   string response_str_;
+public:
+  size_t length_;
 
 public:
   class BadRequest : std::runtime_error {

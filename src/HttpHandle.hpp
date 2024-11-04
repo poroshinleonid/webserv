@@ -16,12 +16,14 @@ namespace HttpHandle {
 struct normalResponse {
   std::string response;
   bool is_keep_alive;
+  size_t request_str_len;
 };
 
 struct cgiResponse {
   int cgi_pid;
   int cgi_pipe[2];
   bool is_keep_alive;
+  size_t request_str_len;
 };
 
 struct requestNotFinished {

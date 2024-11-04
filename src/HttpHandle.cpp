@@ -86,7 +86,10 @@ response HttpHandle::compose_response(const std::string &request_str,
   }
 
   if (url_config.key_exists("redirect")) {
-    return redirection_response(url_config["redirect"].unwrap(), is_keep_alive);
+    auto rsp = std::get<normalResponse>(redirection_response(url_config["redirect"].unwrap(), is_keep_alive));
+    rsp.request_str_len = request.get_body().size() + request.get_header().size();
+    rsp.request_str_len += 4; // CRLFCRLF
+    return rsp;
   }
 
   std::vector<std::string> allowed_methods;
@@ -184,10 +187,34 @@ response HttpHandle::compose_response(const std::string &request_str,
     if (path.extension() == cgi_extension) {
       response resp;
       log.log_debug("Sending to CGI: " + request.get_body());
+      connection.cgi_write_buffer = request.get_body();
       if (request.get_method() == HttpRequest::Method::POST) {
+        // here we assume we have read all content-length
+        #if 0
+        std::string &body = connection.cgi_write_buffer;
+        std::string content_type_str;
+        try {
+          content_type_str = request.get_header_at("Content-Type:");
+          if (content_type_str.find("multipart/form-data") != std::string::npos) {
+            std::string boundary_signifier = "boundary=";
+            size_t boundary_str_start = content_type_str.find(boundary_signifier) + boundary_signifier.size();
+            size_t boundary_str_end = content_type_str.find(CRLF, boundary_str_start);
+            size_t boundary_str_sz = boundary_str_end - boundary_str_start;
+            size_t boundary_str = content_type_str.substr(boundary_str_start, boundary_str_sz);
+            
+            size_t boundary_pos = body.find(boundary_str);
+            if (boundary_pos != std::string::npos) {
+              size_t metadata_pos = boundary_pos + boundary_str.size() + 2;
+              //parse metadata to determine the name of the image
+          // we find boundary, remove it and all of the content from it an up to CRLF
+          // the rest of the string is a byte sequence that
+          // is an image
+            }
+          }
+        } catch (...) { /*ignore*/ }
+        #endif
         resp = execute_cgi_response(object_path, request,
                                     is_keep_alive);
-        connection.cgi_write_buffer = request.get_body();
         return resp;
       } else {
         resp = execute_cgi_response(object_path, request,
@@ -257,7 +284,7 @@ response HttpHandle::file_response(const std::string &file_path,
       "Content-Length: " + Libft::ft_itos(content.size()) + "\r\n\r\n");
 
   return normalResponse{.response = response_header_str + content,
-                        .is_keep_alive = is_keep_alive};
+                        .is_keep_alive = is_keep_alive, .request_str_len = 0};
 }
 
 response HttpHandle::redirection_response(const std::string &redirection_url,
@@ -265,7 +292,7 @@ response HttpHandle::redirection_response(const std::string &redirection_url,
   return normalResponse{.response = "HTTP/1.1 301 Moved Permanently\r\n"
                                     "location: " +
                                     redirection_url + "\r\n\r\n",
-                        .is_keep_alive = is_keep_alive};
+                        .is_keep_alive = is_keep_alive, .request_str_len = 0};
 }
 
 response HttpHandle::directory_listing_response(const fs::path &directory_path,
@@ -285,7 +312,7 @@ response HttpHandle::directory_listing_response(const fs::path &directory_path,
       "Content-Length: " + Libft::ft_itos(html_content.size()) + "\r\n\r\n");
 
   return normalResponse{.response = response_header_str + html_content,
-                        .is_keep_alive = is_keep_alive};
+                        .is_keep_alive = is_keep_alive, .request_str_len = 0};
 }
 
 response HttpHandle::no_directory_listing_response(
@@ -375,6 +402,8 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
   std::cout << "PIPES CREATED IN HANDLE: read=" << recv_pipe[0] << ", write=" << send_pipe[1] << ", pid=" << pid_t << std::endl;
   #endif
   cgiResponse res;
+  res.request_str_len = request.get_body().size() + request.get_header().size();
+  res.request_str_len += 4; // CRLFCRLF
   res.cgi_pid = pid_t;
   res.is_keep_alive = is_keep_alive;
   res.cgi_pipe[0] = recv_pipe[0];
@@ -557,7 +586,7 @@ response HttpHandle::status_code_to_response(int status_code,
                                     "\r\n"
                                     "Content-type: text/html\r\n" +
                                     content_sz_str + "\r\n" + error_content,
-                        .is_keep_alive = is_keep_alive};
+                        .is_keep_alive = is_keep_alive, .request_str_len = 0};
 }
 
 response HttpHandle::delete_file_response(const std::string &url_path,
@@ -565,7 +594,7 @@ response HttpHandle::delete_file_response(const std::string &url_path,
   std::string message = "sucesfully deleted: " + url_path + '\n';
   return normalResponse{.response =
                             ok_response_head(ContentType::plain) + message,
-                        .is_keep_alive = is_keep_alive};
+                        .is_keep_alive = is_keep_alive, .request_str_len = 0};
 }
 }; // namespace HttpHandle
 
@@ -581,16 +610,42 @@ std::string get_responses_string(HttpConnection &connection) {
   HttpHandle::response response = HttpHandle::HttpHandle::compose_response(request_str, config, connection);
   try {
     auto resp = std::get<HttpHandle::normalResponse>(response);
-    connection.recv_buffer.clear();
+    // not always clear(), remove header.size() + body.size() (also account for CRLFCRLF if we trimmed it)
+    #ifdef DEBUG
+    std::cout << "request_str: [" << connection.recv_buffer << "]" << std::endl;
+    #endif
+    //here and lower:
+    //remover only response_str_len characters
+    //then check if we had trailing CRLFCRLF and remove them also
+    if (resp.request_str_len > 0) {
+      connection.recv_buffer.erase(0, resp.request_str_len);
+      while (connection.recv_buffer.find(CRLF) == 0) {
+        connection.recv_buffer.erase(0, 2);
+      }
+    } else {
+      connection.recv_buffer.clear();
+    }
     connection.is_response_ready = true;
     connection.is_keep_alive = resp.is_keep_alive;
     return resp.response;
   } catch (std::bad_variant_access &) { /*ignore*/
   }
   try {
+    #ifdef DEBUG
+    std::cout << "request_str: [" << connection.recv_buffer << "]" << std::endl;
+    #endif
     auto resp = std::get<HttpHandle::cgiResponse>(response);
-    // connection.cgi_write_buffer = std::move(connection.)
-    connection.recv_buffer.clear();
+    //here and higher:
+    //remover only response_str_len characters
+    //then check if we had trailing CRLFCRLF and remove them also
+    if (resp.request_str_len > 0) {
+      connection.recv_buffer.erase(0, resp.request_str_len);
+      while (connection.recv_buffer.find(CRLF) == 0) {
+        connection.recv_buffer.erase(0, 2);
+      }
+    } else {
+      connection.recv_buffer.clear();
+    }
     connection.is_keep_alive = resp.is_keep_alive;
     connection.is_cgi_running = true;
     connection.cgi_finished = false;
