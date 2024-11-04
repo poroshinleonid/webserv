@@ -289,10 +289,11 @@ response HttpHandle::file_response(const std::string &file_path,
 
 response HttpHandle::redirection_response(const std::string &redirection_url,
                                           bool is_keep_alive) {
-  return normalResponse{.response = "HTTP/1.1 301 Moved Permanently\r\n"
-                                    "location: " +
+  (void) is_keep_alive;
+  return normalResponse{.response = "HTTP/1.1 302 Found\r\n"
+                                    "Location: " +
                                     redirection_url + "\r\n\r\n",
-                        .is_keep_alive = is_keep_alive, .request_str_len = 0};
+                        .is_keep_alive = false, .request_str_len = 0};
 }
 
 response HttpHandle::directory_listing_response(const fs::path &directory_path,
