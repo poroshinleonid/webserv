@@ -14,14 +14,14 @@ class bcolors:
 
 print(bcolors.OKBLUE + "Configuring webserv" + bcolors.ENDC)
 
+print(bcolors.OKBLUE + "Putting path to webserv folder in src/Config.cfg" + bcolors.ENDC)
+
 config_path = './frontend/Config.cfg'
 with open(config_path, 'r') as config:
     content = config.read()
     content = content.replace('PATHTOWEBSERV', os.getcwd())
 
 open(config_path, 'w').write(content)
-
-print(bcolors.OKBLUE + "Put path to webserv folder in src/Config.cfg" + bcolors.ENDC)
 
 print(bcolors.OKGREEN + "Finished configuring" + bcolors.ENDC)
 
