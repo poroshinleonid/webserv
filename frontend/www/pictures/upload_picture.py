@@ -4,9 +4,11 @@ import os
 import re
 import sys
 
-# Define HTTP responses
-ok_response = b"HTTP/1.1 200 OK\r\nContent-type: text/plain\r\nContent-length: 12\r\n\r\nuploaded\r\n\r\n"
-exists_response = b"HTTP/1.1 200 OK\r\nContent-type: text/plain\r\nContent-length: 23\r\n\r\nfile already exists\r\n\r\n"
+# Define HTTP resposnses
+
+ok_response = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 136\r\nConnection: close\r\n\r\n<script>\r\n    alert(\"File uploaded successfully!\");\r\n    window.location.href = \"/pictures\";\r\n</script>\r\n\r\n"
+
+exists_response = b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 146\r\nConnection: close\r\n\r\n<script>\r\n    alert(\"Error: File already exists. Please upload a different file.\");\r\n    window.location.href = \"/pictures\";\r\n</script>\r\n\r\n"
 
 # Initialize variables
 filename = ""
