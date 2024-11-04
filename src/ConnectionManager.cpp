@@ -87,6 +87,7 @@ int ConnectionManager::start_server(Server &serv) {
     serv.cgi_timeout = serv.default_cgi_timeout;
   }
   int new_listen_fd = socket(AF_INET, SOCK_STREAM, 0);
+  fcntl(new_listen_fd, F_SETFL, O_NONBLOCK);
   if (new_listen_fd < 0) {
     std::string error = "socket(): can't create socket " + serv.host + ":" +
                         Libft::ft_itos(serv.port) + " : " + strerror(errno);
@@ -167,7 +168,6 @@ int ConnectionManager::run() {
     return 1;
   }
   while (!sig_stop) {
-    // write(1, "a", 1);
     int poll_result =
         poll(fds.data(), fds.size(), 10);
     if (poll_result == -1) {
@@ -215,9 +215,10 @@ int ConnectionManager::handle_fds() {
       io_happened = handle_poll_read(fd);
     } else if ((fds[i].revents & POLLOUT) && pollout[i] == TRU) {
       io_happened = handle_poll_write(fd);
-    }
-    else if (fds[i].revents & (POLLHUP)) {
+    } else if (fds[i].revents & (POLLHUP)) {
       handle_revent_problem(fd);
+    } else {
+      cleanup(fd);
     }
     if (pollvec_len != fds.size()) {
       // one of fds was deleted we have no way to
@@ -393,6 +394,7 @@ void ConnectionManager::handle_accept(int fd) {
   sockaddr_in socket_address;
   socklen_t socket_address_length = sizeof(socket_address);
   int new_fd = accept(fd, (sockaddr *)&socket_address, &socket_address_length);
+  fcntl(new_fd, F_SETFL, O_NONBLOCK);
   int optval = 1;
   if (new_fd == -1) {
     logger->log_error("Failed to accept a new connection on socket" +
@@ -669,13 +671,14 @@ bool ConnectionManager::conn_timed_out(int fd) {
   return false;
 }
 
+#include "Base.hpp"
+
 bool ConnectionManager::cgi_timed_out(int fd) {
   (void)fd;
-  return false;
   time_t now;
   now = std::time(&now);
-  double cgi_age = std::difftime(now, connections[fd].last_activity);
-  if (cgi_age > connections[fd].serv->timeout) {
+  double cgi_age = std::difftime(now, connections[fd].last_cgi_activity);
+  if (cgi_age > connections[fd].serv->cgi_timeout) {
     return true;
   }
   return false;
@@ -774,7 +777,7 @@ bool ConnectionManager::cgi_write(int cgi_fd) {
   HttpConnection &connection = connections[write_fd_to_sock[cgi_fd]];
   connection.update_last_cgi_activity();
   int bytes_written = write(cgi_fd, connection.cgi_write_buffer.c_str(), connection.cgi_write_buffer.size());
-  std::cerr << "Written: " << bytes_written << std::endl;
+  std::cout << "[INFO] Written: " << bytes_written << std::endl;
   if (bytes_written < 0) {
     logger->log_error("Can't send data to pipe" + Libft::ft_itos(cgi_fd));
     close(connection.cgi_pipe[1]);
@@ -818,7 +821,6 @@ bool ConnectionManager::write_to_cgi(int cgi_fd) {
   logger->log_debug("write_to_cgi");
   HttpConnection &connection = connections[write_fd_to_sock[cgi_fd]];
   int con_fd = connection.fd;
-  connection.update_last_cgi_activity();
   int status_code;
   connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
   
@@ -827,6 +829,7 @@ bool ConnectionManager::write_to_cgi(int cgi_fd) {
     return false;
   }
   if (connection.cgi_result == 0) { // CGI stil running
+    connection.update_last_cgi_activity();
     return cgi_write(cgi_fd);
   }
   if (connection.cgi_result != connection.cgi_pid) {

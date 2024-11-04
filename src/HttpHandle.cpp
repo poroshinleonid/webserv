@@ -11,6 +11,7 @@
 #include <thread>
 #include <unistd.h>
 #include <cerrno>
+#include <fcntl.h>
 
 bool check_chunked_transfer(const std::string &request_str) {
   if (request_str.find("transfer-encoding: chunked\r\n") != std::string::npos && \
@@ -350,6 +351,11 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     std::cerr << "Pipe error\n";
     throw std::runtime_error("Pipe error");
   }
+  fcntl(recv_pipe[0], F_SETFL, O_NONBLOCK);
+  fcntl(recv_pipe[1], F_SETFL, O_NONBLOCK);
+  fcntl(send_pipe[0], F_SETFL, O_NONBLOCK);
+  fcntl(send_pipe[1], F_SETFL, O_NONBLOCK);
+
   int pid_t = fork();
   if (pid_t == -1) {
     close(recv_pipe[0]);
