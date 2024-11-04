@@ -242,7 +242,6 @@ void ConnectionManager::handle_revent_problem(int fd) {
       handle_cgi_output(conn);
       return;
       int wait_status;
-      logger->log_error("executing WAITPID() in handle_revent_problem" + Libft::ft_itos(conn.cgi_pid));
       int wait_res = waitpid(conn.cgi_pid, &wait_status, WNOHANG);
       if (wait_res < 0) {
         logger->log_warning("POLLHUP + waitpid -1");
@@ -492,7 +491,6 @@ bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
   }
 
   int status_code;
-  logger->log_error("executing WAITPID()" + Libft::ft_itos(connection.cgi_pid));
   connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
   if (connection.cgi_result < 0) {
     logger->log_debug("waitpid -1 on cgi");
@@ -822,7 +820,6 @@ bool ConnectionManager::write_to_cgi(int cgi_fd) {
   int con_fd = connection.fd;
   connection.update_last_cgi_activity();
   int status_code;
-  logger->log_error("executing WAITPID() in write_to_cgi" + Libft::ft_itos(connection.cgi_pid));
   connection.cgi_result = waitpid(connection.cgi_pid, &status_code, WNOHANG);
   
   if (connection.cgi_result < 0) {
