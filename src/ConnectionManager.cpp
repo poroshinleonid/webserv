@@ -53,8 +53,6 @@ int ConnectionManager::setup_server(Server &serv, Config &cfg) {
     } else {
       serv.srv_sockaddr.sin_port = Libft::ft_atoi(port_str);
     }
-    serv.srv_sockaddr.sin_addr.s_addr =
-        Config::string_to_ip(cfg["host"].unwrap());
     Libft::ft_memset(serv.srv_sockaddr.sin_zero, 8, 0);
     serv.host = cfg["host"].unwrap();
     serv.port = serv.srv_sockaddr.sin_port;
@@ -97,7 +95,7 @@ int ConnectionManager::start_server(Server &serv) {
   }
   struct sockaddr_in server_addr_in;
   server_addr_in.sin_family = serv.srv_sockaddr.sin_family;
-  server_addr_in.sin_addr.s_addr = htonl(serv.srv_sockaddr.sin_addr.s_addr);
+  server_addr_in.sin_addr.s_addr = INADDR_ANY;
   server_addr_in.sin_port = htons(serv.port);
   Libft::ft_memset(&(server_addr_in.sin_zero), 8, 0);
   int opt = 1;
