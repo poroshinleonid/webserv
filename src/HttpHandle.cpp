@@ -612,7 +612,7 @@ std::string get_responses_string(HttpConnection &connection) {
     auto resp = std::get<HttpHandle::normalResponse>(response);
     // not always clear(), remove header.size() + body.size() (also account for CRLFCRLF if we trimmed it)
     #ifdef DEBUG
-    std::cout << "request_str: [" << connection.recv_buffer << "]" << std::endl;
+    std::cout << "Normal response prepared for request_str: [" << connection.recv_buffer << "]" << std::endl;
     #endif
     //here and lower:
     //remover only response_str_len characters
@@ -631,10 +631,11 @@ std::string get_responses_string(HttpConnection &connection) {
   } catch (std::bad_variant_access &) { /*ignore*/
   }
   try {
-    #ifdef DEBUG
-    std::cout << "request_str: [" << connection.recv_buffer << "]" << std::endl;
-    #endif
+
     auto resp = std::get<HttpHandle::cgiResponse>(response);
+    #ifdef DEBUG
+    std::cout << "CGI response is being cooked for request_str: [" << connection.recv_buffer << "]" << std::endl;
+    #endif
     //here and higher:
     //remover only response_str_len characters
     //then check if we had trailing CRLFCRLF and remove them also

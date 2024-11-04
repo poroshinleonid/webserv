@@ -88,17 +88,21 @@ HttpRequest::HttpRequest(const string &s) {
   std::string body;
   size_t content_length;
   if (headers_.find("content-length") != headers_.end()) {
-    std::cout << "Content-length found, reading the body, i.e. the content" << std::endl;
     content_length = Libft::ft_atoi(headers_.at("content-length"));
     size_t body_start = s.find(CRLFCRLF) + 4;
     body_ = s.substr(body_start, s.size() - body_start);
+    std::cout << "Content-length found, reading the body, i.e. the content: " << Libft::ft_itos(content_length);
+    std::cout << ", req_str size = " << s.size() << ", body_.size()=" << body_.size() << std::endl;
     if (body_.size() < content_length) {
+      std::cout << "Not finisned reading the body yet!" << std::endl;
       throw RequestNotFinished("Not finished unchunked request");
     } else if (body_.size() > content_length) {
+      std::cout << "BODY IS BIG AND bigger than content-length!" << std::endl;
       body_ = body_.substr(0, content_length);
       length_ = body_.size() + header_.size() + 4;
       return;
     } else { // content_length = body_.size()
+      std::cout << "content_length = body_.size()" << std::endl;
       length_ = body_.size() + header_.size() + 4;
       return;
     }
