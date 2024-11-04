@@ -131,9 +131,7 @@ int ConnectionManager::start_server(Server &serv) {
   serv.listen_fd = new_listen_fd;
   listen_servers[serv.listen_fd] = serv;
   struct pollfd poll_fd = {serv.listen_fd, POLLIN | POLLOUT, 0};
-  fds.push_back(poll_fd);
-  pollin.push_back(TRU);
-  pollout.push_back(FALS);
+  add_pollfd(poll_fd, TRU, FALS);
   return 0;
 }
 
@@ -171,7 +169,6 @@ int ConnectionManager::run() {
     return 1;
   }
   while (!sig_stop) {
-    // std::cout << "poll()" << std::endl;
     // write(1, "a", 1);
     int poll_result =
         poll(fds.data(), fds.size(), 10);
@@ -212,6 +209,7 @@ int ConnectionManager::handle_fds() {
   size_t pollvec_len = fds.size();
   for (size_t i = 0; i < pollvec_len; i++) {
     int fd = fds[i].fd;
+    // std::cout <<"[" << fd << "]" << std::flush;
     if (io_happened) {
       cleanup(fd);
     } else if (fds[i].revents & (POLLERR | POLLNVAL)) {
@@ -221,10 +219,12 @@ int ConnectionManager::handle_fds() {
     } else if ((fds[i].revents & POLLOUT) && pollout[i] == TRU) {
       io_happened = handle_poll_write(fd);
     }
+    // else if (fds[i].revents & (POLLHUP)) {
+    //   handle_revent_problem(fd);
+    // }
     if (pollvec_len != fds.size()) {
-      // one of the fds was deleted
-      // we have no way to knof if it is before or after
-      // the current one so we restart the poll loop
+      // one of fds was deleted we have no way to
+      // knof if it is b4 or after the current one so poll() again
       break;
     }
   }
@@ -239,8 +239,21 @@ void ConnectionManager::handle_revent_problem(int fd) {
     fd_type = "Pipe-write fd ";
   }
   if (fds[find_fd_index(fd)].revents & POLLHUP) {
-    logger->log_error(fd_type + Libft::ft_itos(fd) +
-                      " hung up incorrectly (POLLHUP).");
+    if (read_fd_to_sock.find(fd) != read_fd_to_sock.end()) {
+      int conn_fd = read_fd_to_sock[fd];
+      logger->log_warning(fd_type + Libft::ft_itos(fd) +
+                        " exited before we finished reading (POLLHUP).");
+      logger->log_warning(connections[fd].send_buffer);
+      kill_cgi_and_prep_to_send_500(conn_fd, true);
+      return;
+    }
+    if (write_fd_to_sock.find(fd) != write_fd_to_sock.end()) {
+      int conn_fd = write_fd_to_sock[fd];
+      logger->log_warning(fd_type + Libft::ft_itos(fd) +
+                        " exited before we finished writing (POLLHUP).");
+      kill_cgi_and_prep_to_send_500(conn_fd, true);
+      return;
+    }
   } else if (fds[find_fd_index(fd)].revents & POLLNVAL) {
     logger->log_error(fd_type + Libft::ft_itos(fd) +
                       " is closed unexpectedly (POLLNVAL).");
@@ -265,6 +278,7 @@ void ConnectionManager::handle_revent_problem(int fd) {
 
 bool ConnectionManager::handle_poll_read(int fd) {
   if (pollin[find_fd_index(fd)] == FALS) {
+    // logger->log_debug("POLLIN ON IGNORED FD " + Libft::ft_itos(fd));
     return false;
   }
   fds[find_fd_index(fd)].revents = 0;
@@ -339,18 +353,14 @@ bool ConnectionManager::handle_poll_read(int fd) {
   if (response_string.empty() && connection.is_cgi_running == true) {
     pollout[find_fd_index(fd)] = FALS;
     struct pollfd pollfd_read_s = {connection.cgi_pipe[0], POLLIN | POLLOUT, 0};
-    fds.push_back(pollfd_read_s);
-    pollin.push_back(TRU);
-    pollout.push_back(FALS);
+    add_pollfd(pollfd_read_s, TRU, FALS);
     read_fd_to_sock[connection.cgi_pipe[0]] = fd;
 
     // if (!connection.cgi_write_buffer.empty()) {
     struct pollfd pollfd_write_s = {connection.cgi_pipe[1], POLLIN | POLLOUT, 0};
-    fds.push_back(pollfd_write_s);
-    pollin.push_back(FALS);
-    pollout.push_back(TRU);
+    add_pollfd(pollfd_write_s, FALS, TRU);
     write_fd_to_sock[connection.cgi_pipe[1]] = fd;
-    logger->log_info("Socket " + Libft::ft_itos(fd) + ": established cgi pipes:  fd " + Libft::ft_itos(connection.cgi_pipe[1]) + ", read from cgi from fd " + Libft::ft_itos(connection.cgi_pipe[0]));
+    logger->log_info("Socket " + Libft::ft_itos(fd) + ": established cgi pipes: write to  fd " + Libft::ft_itos(connection.cgi_pipe[1]) + ", read from cgi from fd " + Libft::ft_itos(connection.cgi_pipe[0]));
     connection.update_last_cgi_activity();
     // } else {
     //   logger->log_info("Socket " + Libft::ft_itos(fd) + ": established cgi pipe: read from cgi from fd " + Libft::ft_itos(connection.cgi_pipe[0]));
@@ -388,9 +398,7 @@ void ConnectionManager::handle_accept(int fd) {
   struct pollfd new_pollfd_struct;
   new_pollfd_struct.fd = new_fd;
   new_pollfd_struct.events = POLLIN | POLLOUT;
-  fds.push_back(new_pollfd_struct);
-  pollin.push_back(TRU);
-  pollout.push_back(FALS);
+  add_pollfd(new_pollfd_struct, TRU, FALS);
   HttpConnection connection(config, logger, &listen_servers[fd]);
   connection.fd = new_fd;
   connections[new_fd] = connection;
@@ -462,6 +470,7 @@ bool ConnectionManager::handle_poll_write(int fd) {
 
 //rewrite based on write_to_cgi
 bool ConnectionManager::handle_cgi_output(HttpConnection &connection) {
+  logger->log_debug("Read from CGI!");
   // if the cgi has already been set to finished, read from the pipe
   if (connection.cgi_finished) {
     return read_cgi_pipe(connection);
@@ -570,6 +579,20 @@ bool ConnectionManager::read_cgi_pipe(HttpConnection &connection) {
 
 /*------------ UTILS ----------------*/
 
+void ConnectionManager::add_pollfd(struct pollfd fd, int poll_in_flag, int poll_out_flag) {
+  logger->log_debug("Added pollfd " + Libft::ft_itos(fd.fd));
+  fds.push_back(fd);
+  pollin.push_back(poll_in_flag);
+  pollout.push_back(poll_out_flag);
+}
+
+void ConnectionManager::remove_pollfd(size_t index) {
+  logger->log_debug("Removed pollfd " + Libft::ft_itos(fds[index].fd));
+  fds.erase(fds.begin() + index);
+  pollin.erase(pollin.begin() + index);
+  pollout.erase(pollout.begin() + index);
+}
+
 /**
  * @brief takes connection and correctly closes it, closes the sockets and pipes
  * etc
@@ -586,9 +609,7 @@ void ConnectionManager::close_connection(int fd) {
   }
   for (size_t i = 0, ie = fds.size(); i < ie; ++i) {
     if (fds[i].fd == fd) {
-      fds.erase(fds.begin() + i);
-      pollin.erase(pollin.begin() + i);
-      pollout.erase(pollout.begin() + i);
+      remove_pollfd(i);
       break;
     }
   }
@@ -626,22 +647,22 @@ void ConnectionManager::kill_cgi(int connection_fd, bool send_kill_sig) {
   }
   int read_pipe = connections[connection_fd].cgi_pipe[0];
   close(read_pipe);
-  pollin.erase(pollin.begin() + find_fd_index(read_pipe));
-  fds.erase(fds.begin() + find_fd_index(read_pipe));
+  remove_pollfd(find_fd_index(read_pipe));
   read_fd_to_sock.erase(connections[connection_fd].cgi_pipe[0]);
 
   int write_pipe = connections[connection_fd].cgi_pipe[1];
   if (write_pipe != -1) {
-  close(write_pipe);
-  pollin.erase(pollin.begin() + find_fd_index(write_pipe));
-  fds.erase(fds.begin() + find_fd_index(write_pipe));
-  write_fd_to_sock.erase(connections[connection_fd].cgi_pipe[1]);
-  logger->log_info("Killed CGI: Socket " + Libft::ft_itos(connection_fd) + ", read fd: " + Libft::ft_itos(read_pipe) + ", write fd: " + Libft::ft_itos(write_pipe));
+    close(write_pipe);
+    remove_pollfd(find_fd_index(write_pipe));
+    write_fd_to_sock.erase(connections[connection_fd].cgi_pipe[1]);
+    logger->log_info("Killed CGI: Socket " + Libft::ft_itos(connection_fd) + ", read fd: " + Libft::ft_itos(read_pipe) + ", write fd: " + Libft::ft_itos(write_pipe));
   } else {
-  logger->log_info("Killed CGI: Socket " + Libft::ft_itos(connection_fd) + ", read fd: " + Libft::ft_itos(read_pipe) + ", no write fd");
+    logger->log_info("Killed CGI: Socket " + Libft::ft_itos(connection_fd) + ", read fd: " + Libft::ft_itos(read_pipe) + ", no write fd");
   }
-
   connections[connection_fd].is_cgi_running = false;
+  connections[connection_fd].cgi_pid = 0;
+  connections[connection_fd].cgi_pipe[0] = 0;
+  connections[connection_fd].cgi_pipe[1] = 0;
 }
 
 void ConnectionManager::timeout_and_kill_cgi(int connection_fd, bool send_kill_sig) {
@@ -663,9 +684,7 @@ void ConnectionManager::shutdown_server(int listen_fd) {
   close(srv->listen_fd);
   for (size_t i = 0, ie = fds.size(); i < ie; ++i) {
     if (fds[i].fd == listen_fd) {
-      fds.erase(fds.begin() + i);
-      pollin.erase(pollin.begin() + i);
-      pollout.erase(pollout.begin() + i);
+      remove_pollfd(i);
       break;
     }
   }
@@ -719,8 +738,7 @@ bool ConnectionManager::cgi_write(int cgi_pid) {
   if (bytes_written < 0) {
     logger->log_error("Can't send data to pipe" + Libft::ft_itos(cgi_pid));
     close(connection.cgi_pipe[1]);
-    pollin.erase(pollin.begin() + find_fd_index(connection.cgi_pipe[1]));
-    fds.erase(fds.begin() + find_fd_index(connection.cgi_pipe[1]));
+    remove_pollfd(find_fd_index(connection.cgi_pipe[1]));
     write_fd_to_sock.erase(connection.cgi_pipe[1]);
     connection.cgi_pipe[1] = -1;
     kill_cgi_and_prep_to_send_500(connection.fd, true);
@@ -728,18 +746,17 @@ bool ConnectionManager::cgi_write(int cgi_pid) {
     //nothing to write to cgi, stop poll()ing the write pipe
     pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
     close(connection.cgi_pipe[1]);
-    pollin.erase(pollin.begin() + find_fd_index(connection.cgi_pipe[1]));
-    fds.erase(fds.begin() + find_fd_index(connection.cgi_pipe[1]));
+    remove_pollfd(find_fd_index(connection.cgi_pipe[1]));
     write_fd_to_sock.erase(connection.cgi_pipe[1]);
     connection.cgi_pipe[1] = -1;
   } else if (bytes_written < static_cast<int>(connection.cgi_write_buffer.size())) {
+    logger->log_info("Written less: bytes=" + Libft::ft_itos(bytes_written) + ", size=" + Libft::ft_itos(connection.cgi_write_buffer.size()));
     connection.cgi_write_buffer.erase(0, bytes_written);
   } else { // bytes_written < BUF_SZ
+    logger->log_info("Written enough: bytes=" + Libft::ft_itos(bytes_written) + ", size=" + Libft::ft_itos(connection.cgi_write_buffer.size()));
     connection.cgi_write_buffer.clear();
-    pollout[find_fd_index(connection.cgi_pipe[1])] = FALS;
     close(connection.cgi_pipe[1]);
-    pollin.erase(pollin.begin() + find_fd_index(connection.cgi_pipe[1]));
-    fds.erase(fds.begin() + find_fd_index(connection.cgi_pipe[1]));
+    remove_pollfd(find_fd_index(connection.cgi_pipe[1]));
     write_fd_to_sock.erase(connection.cgi_pipe[1]);
     connection.cgi_pipe[1] = -1;
   }
@@ -758,6 +775,7 @@ void ConnectionManager::kill_cgi_and_prep_to_send_500(int con_fd, bool send_kill
 }
 
 bool ConnectionManager::write_to_cgi(int cgi_pid) {
+  logger->log_debug("write_to_cgi");
   HttpConnection &connection = connections[write_fd_to_sock[cgi_pid]];
   int con_fd = connection.fd;
   connection.update_last_cgi_activity();

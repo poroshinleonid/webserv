@@ -6,8 +6,10 @@
 #include <map>
 #include <string>
 #include <vector>
+#include "signal.h"
 
 int main(int argc, char **argv) {
+  signal(SIGCHLD, SIG_IGN);
   if (argc != 2) {
     std::cout << "gib args (conf file)\n";
 

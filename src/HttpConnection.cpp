@@ -103,7 +103,6 @@ HttpChunk HttpConnection::parse_http_chunk() {
   std::string &data = recv_chunk;
   HttpChunk chunk;
   if (data.find(CHUNKTERM) == 0) {
-    std::cout << "CHUNKTERM AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" << std::endl;
     data.erase(0, 5);
     next_requests_str = data;
     data.clear();

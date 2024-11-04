@@ -91,6 +91,9 @@ private:
    */
   void cleanup(int fd);
 
+  void  add_pollfd(struct pollfd fd, int poll_in_flag, int poll_out_flag);
+  void  remove_pollfd(size_t index);
+
   /**
    * @brief Go through pollfd vector after poll() returned positive value
    *

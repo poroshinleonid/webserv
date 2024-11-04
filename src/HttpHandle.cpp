@@ -343,7 +343,7 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
     close(send_pipe[1]);
     std::string resp_s = request.get_response_str();
     const char *resp_c_str = resp_s.c_str();
-    const std::string CGI_PATH = "/usr/bin/python3";
+    const std::string CGI_PATH = "/usr/bin/python3 -u ";
     char *const argv[] = { const_cast<char *>(CGI_PATH.c_str()),
                           const_cast<char *>(script_path.c_str()),
                           const_cast<char *>(resp_c_str), NULL};
@@ -375,6 +375,7 @@ response HttpHandle::execute_cgi_response(const std::string &script_path,
   // pid != 0 - we are inside the parent
   close(send_pipe[0]);
   close(recv_pipe[1]);
+  std::cout << "PIPES CREATED IN HANDLE: read=" << recv_pipe[0] << ", write=" << send_pipe[1] << std::endl;
   cgiResponse res;
   res.cgi_pid = pid_t;
   res.is_keep_alive = is_keep_alive;
